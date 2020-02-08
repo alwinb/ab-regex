@@ -1,0 +1,34 @@
+{
+  "name": "ab-regex",
+  "version": "0.1.0-alpha",
+  "description": "regular expression engine",
+  "main": "src/index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "dependencies": {
+    "ab-parse": "git+https://github.com/alwinb/ab-parse.git"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alwinb/ab-regex.git"
+  },
+  "keywords": [
+    "regular",
+    "expression",
+    "regexp",
+    "regex",
+    "compiler",
+    "dfa"
+  ],
+  "author": "Alwin Blok",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/alwinb/ab-regex/issues"
+  },
+  "homepage": "https://github.com/alwinb/ab-regex#readme"
+}
