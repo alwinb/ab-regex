@@ -213,6 +213,9 @@ function _nullable (fx) {
 //
 //  One Level
 
+const first = ([a]) => a
+const second = ([,b]) => b
+
 function Compiler () {
   const Terms = new TermStore ()
   const { terms, inn, out } = Terms
@@ -235,69 +238,67 @@ function Compiler () {
   }
 
   // Returns a tuple [ term-id, accepts, derivative ]
-  // where the derivative in turn is a range list of term-ids
+  // where the derivative in turn is a RangeList of term-ids
 
-  function _apply (fx) {
-    const ts = F (([x,a,d]) => x) (fx)
-    const as = F (([x,a,d]) => a) (fx)
-    const ds = F (([x,a,d]) => d) (fx)
-    const x = inn (ts) // store it as a term
-    const a = _nullable (as)
-    const d = _derivative (x, ts, as, ds)
-    return [x, a, d]
-  }
-  
-  function apply (fx) {
-    const [x, a, d] = _apply (fx)
-    if (x in nodes) return nodes[x]
-    nodes[x] = [x,a,d]
+  function apply (nodeOp) {
+    const node = _apply (nodeOp)
 
-    // The _derivative function may have generated new terms, leaving 
-    // the memo map incomplete. Since the ordering of the heap is compatible
-    // with the subterm order, we can simply fill it out by passing over it LTR
+    // _apply may extend the `terms` array
+    // so we need to fill out the `nodes` array accordingly. 
+    // The ordering of the terms is compatible with the subterm order, 
+    // and so we do a 'fast fold' by passing over it left-to-right to catch up. 
 
     for (let i = nodes.length; i < terms.length; i++) {
-      const fx = F (x => nodes[x]) (terms [i])
-      nodes[i] = _apply(fx)
+      const nodeOp = F (x => nodes[x]) (terms [i])
+      nodes[i] = _apply (nodeOp)
     }
-
-    return nodes[x]
+    return node
   }
 
-  // private helper function for implementing apply 
+  function _apply (nodeOp) {
+    const fx = F (first) (nodeOp)
+    const fa = F (second) (nodeOp)
+    const x = inn (fx)
+    return [x, _nullable(fa), _derivative (nodeOp, x, fx, fa)]
+  }
 
-  function _derivative (t, ft, fa, fd) {
-    const [op, t1, t2] = ft
-    const [_ , a1, a2] = fa
-    const [__, d1, d2] = fd
+  function _derivative (nodeOp, x, fx, fa) {
+    const [op, r, s] = fx
 
-    switch (op) {
-      case GROUP: return d1
-      case BOT:   return new Rest (Terms.bottom)
-      case TOP:   return new Rest (Terms.top)
-      case UNIT:  return new Rest (Terms.bottom)
+    switch (op) { // constants
+      case BOT:  return new Rest (Terms.bottom)
+      case TOP:  return new Rest (Terms.top)
+      case UNIT: return new Rest (Terms.bottom)
       //case TEST:
-
       case STEP:
-        return RL.map (b => b ? Terms.unit : Terms.bottom, RS.eq (d1), Terms.compare)
+        return RL.map (b => b ? Terms.unit : Terms.bottom, RS.eq (fx[1]), Terms.compare)
+    }
+
+    const [x1, ar, dr] = nodeOp[1] // unary operations
+    switch (op) {
+      case GROUP:
+        return dr
 
       case NOT:
-        return RL.map (Terms.not, d1)
+        return RL.map (Terms.not, dr)
 
       case STAR:
-        return RL.map (dr => Terms.conc (dr, t), d1)
+        return RL.map (dr => Terms.conc (dr, x), dr)
+    }
 
+    const [x2, as, ds] = nodeOp[2] // unary operations
+    switch (op) {
       case AND:
-        return RL.merge (Terms.and, d1, d2, Terms.compare)
+        return RL.merge (Terms.and, dr, ds, Terms.compare)
 
       case OR:
-        return RL.merge (Terms.or, d1, d2, Terms.compare)
+        return RL.merge (Terms.or, dr, ds, Terms.compare)
 
       case CONC:
-        const left = RL.map (dr => Terms.conc (dr, t2), d1, Terms.compare) // left = ∂t1•t2
-        return !a1 ? left : RL.merge (Terms.or, left, d2, Terms.compare) // if t1 accepts then left, else (left + ∂t2)
+        const left = RL.map (dr => Terms.conc (dr, s), dr, Terms.compare) // left = ∂r•s
+        return !ar ? left : RL.merge (Terms.or, left, ds, Terms.compare) // if r accepts then left, else (left + ∂s)
       break
-      }
+    }
   }
 
   function run (id, string) {
