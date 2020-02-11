@@ -2,57 +2,66 @@ const Map = require ('./aatree')
 const { RangeList:RL, RangeSet:RS, Upto, Rest } = require ('./rangelist')
 const log = console.log.bind (console)
 
+// JavaScript's built-in total order
+
+const cmp_js = (t1, t2) =>
+  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
+
 //
 //  Signature
 
-const TEST = 'TEST'
-  , STEP = 'STEP'
-  , TOP  = 'TOP'
-  , BOT  = 'BOT'
-  , UNIT = 'UNIT'
-  , NOT  = 'NOT'
-  , STAR = 'STAR'
-  , AND  = 'AND'
-  , OR   = 'OR'
-  , CONC = 'CONC'
+const STEP  = 'STEP'
+  , ANY   = 'ANY'
+  , RANGE = 'RANGE'
+  , TOP   = 'TOP'
+  , BOT   = 'BOT'
+  , UNIT  = 'UNIT'
+  , NOT   = 'NOT'
+  , STAR  = 'STAR'
+  , OPT   = 'OPT'
+  , PLUS  = 'PLUS'
+  , AND   = 'AND'
+  , OR    = 'OR'
+  , CONC  = 'CONC'
   , GROUP = 'GROUP'
 
 const signature =
-  { [TEST]: 0
-  , [STEP]: 0
+  { [STEP]: 0
+  , [ANY]: 0
+  , [RANGE]: 0
   , [UNIT]: 0
   , [TOP]: 0
   , [BOT]: 0
   , [GROUP]: 1
   , [NOT]: 1
   , [STAR]: 1
+  , [OPT]: 1
+  , [PLUS]: 1
   , [AND]: 2
   , [OR]: 2
   , [CONC]: 2 }
 
-// Morphism part
+//
+//  Signature functor, morphism part
 
 const F = fn => tm => {
   const [c, x, y] = tm
   return (
-      c === TEST  ? tm
-    : c === STEP  ? tm
+      c === STEP  ? tm
+    : c === ANY   ? tm
+    : c === RANGE ? tm
     : c === UNIT  ? tm
     : c === TOP   ? tm
     : c === BOT   ? tm
     : c === GROUP ? [c, fn(x)]
     : c === NOT   ? [c, fn(x)]
     : c === STAR  ? [c, fn(x)]
+    : c === OPT   ? [c, fn(x)]
+    : c === PLUS  ? [c, fn(x)]
     : c === AND   ? [c, fn(x), fn(y)]
     : c === OR    ? [c, fn(x), fn(y)]
     : c === CONC  ? [c, fn(x), fn(y)]
     : undefined ) }
-
-
-// JavaScript's built-in total order
-
-const cmp_js = (t1, t2) =>
-  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 
 // Provided a total order on X,
 //  produces a total order on FX
@@ -60,8 +69,8 @@ const cmp_js = (t1, t2) =>
 const compareFNode = cmp_x => (a, b) => {
   const c = a[0], d = b[0]
   const r = cmp_js (c, d)
-    || (c === TEST || 0) && cmp_js (a[1], b[1])
-    || (c === STEP || 0) && cmp_js (a[1], b[1])
+    || (c === STEP  || 0) && cmp_js (a[1], b[1])
+    || (c === RANGE || 0) && (cmp_js (a[1], b[1]) || cmp_js (a[2], b[2]))
     || (signature [c] > 0 || 0) && cmp_x (a[1], b[1])
     || (signature [c] > 1 || 0) && cmp_x (a[2], b[2])
   return r }
@@ -80,12 +89,12 @@ function _normalize (out, inn, fx) {
   switch (op) {
 
     case GROUP:
-      return fx[1]
+      return a1
 
-    case STEP: 
+    case STEP: case ANY: case RANGE:
       return inn (fx)
 
-    case TEST: case TOP: case BOT: case UNIT:
+    case TOP: case BOT: case UNIT:
       return inn (fx)
 
     case NOT: {
@@ -102,6 +111,15 @@ function _normalize (out, inn, fx) {
         : c1 === TOP  ? a1
         : c1 === BOT  ? inn ([UNIT])
         : inn (fx) )
+    }
+
+    case OPT: {
+      return inn (fx)
+      // TODO optimise the '?' operator
+    }
+    case PLUS: {
+      return inn (fx)
+      // TODO optimise the '+' operator
     }
 
     case AND: {
@@ -159,6 +177,8 @@ function _init (apply) {
   this.step = c => apply ([STEP, c])
   this.not = x => apply ([NOT, x])
   this.star = x => apply ([STAR, x])
+  this.opt = x => apply ([OPT, x])
+  this.plus = x => apply ([PLUS, x])
   this.and = (x, y) => apply ([AND, x, y])
   this.or = (x, y) => apply ([OR, x, y])
   this.conc = (x, y) => apply ([CONC, x, y])
@@ -193,25 +213,30 @@ function TermStore () {
 }
 
 
-function _nullable (fx) {
-  const [op, t1, t2] = fx
-  switch (op) { 
-    case GROUP: return t1
-    case UNIT: return true
-    case TOP: return true
-    case BOT: return false
-    case STEP: return false
-    //case TEST:
-    case NOT: return !t1
-    case STAR: return true
-    case AND: return t1 && t2
-    case OR: return t1 || t2
-    case CONC: return t1 && t2
-  }
-}
-
 //
 //  One Level
+
+function _nullable ([op, nr, ns]) {
+  switch (op) { 
+    // constants
+    case BOT: return false
+    case TOP: return true
+    case UNIT: return true
+    case STEP: return false
+    case ANY: return false
+    case RANGE: return false
+    // unary
+    case GROUP: return nr
+    case STAR: return true
+    case PLUS: return nr
+    case OPT: return true
+    case NOT: return !nr
+    // binary
+    case OR: return nr || ns
+    case AND: return nr && ns
+    case CONC: return nr && ns
+  }
+}
 
 const first = ([a]) => a
 const second = ([,b]) => b
@@ -269,7 +294,6 @@ function Compiler () {
       case BOT:  return new Rest (Terms.bottom)
       case TOP:  return new Rest (Terms.top)
       case UNIT: return new Rest (Terms.bottom)
-      //case TEST:
       case STEP:
         return RL.map (b => b ? Terms.unit : Terms.bottom, RS.eq (fx[1]), Terms.compare)
     }
