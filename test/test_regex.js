@@ -1,6 +1,7 @@
 const log = console.log.bind (console)
-const { tokenize, parse } = require ('./parser')
-const { TermStore, Compiler } = require ('./dfa')
+const { tokenize, parse } = require ('../src/parser')
+const { TermStore, Compiler } = require ('../src/dfa')
+const Regex = require ('../src/')
 
 //
 //  Test Parser
@@ -77,24 +78,31 @@ function testRun (sample, input) {
 }
 
 
-// testRun ('a*b', 'aab')
-// testRun ('a|b*', 'b')
-// testRun ('a|b*', 'bbbb')
-// testRun ('a|b*', 'ba')
-// testRun ('a|b*', 'a')
-// testRun ('abc* & abc', 'abcc')
-// testRun ('!ab', 'ab')
-// testRun ('[a-z]', 'hi')
-// testRun ('[a-z]*', 'abc')
-// testRun ('[a-z]*...', 'abc___')
-// testRun ('hii?', 'h')
-// testRun ('hii?', 'hi')
-// testRun ('hii?', 'hii')
-// testRun ('hi+', 'hiii')
-// testRun ('hi+', 'h')
-// testRun ('hi+', 'hi')
-// testRun ('hi+', 'hii')
-// testRun ('hi+', 'hiii')
+/*
+testRun ('a*b', 'aab')
+testRun ('a|b*', 'b')
+testRun ('a|b*', 'bbbb')
+testRun ('a|b*', 'ba')
+testRun ('a|b*', 'a')
+testRun ('abc* & abc', 'abcc')
+testRun ('!ab', 'ab')
+testRun ('[a-z]', 'hi')
+testRun ('[a-z]*', 'abc')
+testRun ('[a-z]*...', 'abc___')
+//*/
+
+/*
+testRun ('hii?', 'h')
+testRun ('hii?', 'hi')
+testRun ('hii?', 'hii')
+testRun ('hi+', 'hiii')
+testRun ('hi+', 'h')
+testRun ('hi+', 'hi')
+testRun ('hi+', 'hii')
+testRun ('hi+', 'hiii')
+//*/
+
+/*
 testRun ('(hi)+', 'h')
 testRun ('(hi)+', 'hi')
 testRun ('(hi)+', 'hih')
@@ -102,3 +110,61 @@ testRun ('(hi)+', 'hihi')
 testRun ('(hi)+', 'hihih')
 testRun ('(hi)+', 'hihihi')
 testRun ('(hi)+', 'hihihih')
+//*/
+
+//
+//  Test Regex Object
+//
+
+//*
+var r = new Regex ('ab*x')
+log (r)
+
+log (r.test ('abbbx'))
+log (r.reduce ('ab'))
+log (r.reduce ('bbb'))
+log (r.reduce ('x'))
+log (r.reduce ('a'))
+//*/
+
+
+/*
+var r = new Regex ('ab*x')
+var r = new Regex ('ab?x')
+var r = new Regex ('ab+x')
+log(r)
+log (r.test ('ax'))
+log (r.test ('abx'))
+log (r.test ('abbx'))
+log (r.test ('abbbx'))
+//*/
+
+/*
+var r = new Regex ('(ab)*x')
+var r = new Regex ('(ab)?x')
+var r = new Regex ('(ab)+x')
+
+log (r.test ('x'))
+log (r.test ('abx'))
+log (r.test ('ababx'))
+log (r.test ('abababx'))
+log (r.test ('ababax'))
+//*/
+
+/*
+var r = new Regex ('a.c')
+log (r.test ('ac'))
+log (r.test ('axc'))
+log (r.test ('ayc'))
+log (r.test ('aac'))
+log (r.test ('acc'))
+//*/
+
+/*
+var r = new Regex ('(. &!(X|Y))*')
+log (r.test ('aXYc'))
+log (r.test ('axc'))
+log (r.test ('ayc'))
+log (r.test ('aac'))
+log (r.test ('acc'))
+//*/
