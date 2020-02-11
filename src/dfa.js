@@ -148,13 +148,50 @@ function _normalize (out, inn, fx) {
   }
 }
 
-//
-//  One Level
 
-// A one-level unfolding of a term will be
-// a tuple [term, accepts, deriv] with each item
-// implemented via a regex algebra, however,
-// the last one depending on the previous two. 
+//
+// Store for normalized terms
+
+function _init (apply) {
+  this.bottom = apply ([BOT])
+  this.top = apply ([TOP])
+  this.unit = apply ([UNIT])
+  this.step = c => apply ([STEP, c])
+  this.not = x => apply ([NOT, x])
+  this.star = x => apply ([STAR, x])
+  this.and = (x, y) => apply ([AND, x, y])
+  this.or = (x, y) => apply ([OR, x, y])
+  this.conc = (x, y) => apply ([CONC, x, y])
+}
+
+function TermStore () {
+
+  let memo = new Map (compareFNode (cmp_js))
+  const heap = []
+
+  function inn (fx) {
+    return _normalize (out, _inn, fx)
+  }
+
+  function out (x) {
+    return heap [x]
+  }
+
+  function _inn (fx) {
+    const cursor = memo.select (fx)
+    if (cursor.found) return cursor.value
+    const x = heap.push (fx) - 1
+    memo = cursor.set (x)
+    return x
+  }
+
+  //this.inn = inn
+  this.out = out
+  this.inn = inn
+  this.terms = heap
+  _init.call (this, inn)
+}
+
 
 function _nullable (fx) {
   const [op, t1, t2] = fx
@@ -173,60 +210,25 @@ function _nullable (fx) {
   }
 }
 
-
-// Store for normalized terms
-
-function TermStore () {
-  let memo = new Map (compareFNode (cmp_js))
-  const heap = []
-
-  const inn = fx => {
-    const cursor = memo.lookup (fx)
-    if (cursor.found) return cursor.value
-    const x = heap.push (fx) - 1
-    memo = cursor.set (x)
-    //if (alg) _eval[x] = alg (F (this.eval) (fx))
-    return x
-  }
-
-  const out = x => heap [x]
-  const apply = fx => _normalize (out, inn, fx)
-
-  //this.inn = inn
-  this.out = out
-  this.apply = apply
-
-  this.bot = apply ([BOT])
-  this.top = apply ([TOP])
-  this.unit = apply ([UNIT])
-  this.not = x => apply ([NOT, x])
-  this.star = x => apply ([STAR, x])
-  this.and = (x, y) => apply ([AND, x, y])
-  this.or = (x, y) => apply ([OR, x, y])
-  this.conc = (x, y) => apply ([CONC, x, y])
-
-  this._heap = heap
-}
-
+//
+//  One Level
 
 function Compiler () {
   const Terms = new TermStore ()
-  const Memo = [] // table for eval: X -> Y
+  const { terms, inn, out } = Terms
+  const nodes = [] // table for eval: X -> Y
+
+  const _map = (f, xs) => map (f, xs, cmp_js, cmp_js)
+  const _merge = (f, xs, ys) => merge (f, xs, ys, cmp_js, cmp_js)
+
+  _init.call (this, apply)
 
   this.apply = apply
-  this.bot = apply ([BOT])
-  this.top = apply ([TOP])
-  this.unit = apply ([UNIT])
-  this.not = x => apply ([NOT, x])
-  this.star = x => apply ([STAR, x])
-  this.and = (x, y) => apply ([AND, x, y])
-  this.or = (x, y) => apply ([OR, x, y])
-  this.conc = (x, y) => apply ([CONC, x, y])
   this.run = run
 
   this.entries = function* () {
-    //log ('entries', Memo)
-    for (let item of Memo) {
+    //log ('entries', nodes)
+    for (let item of nodes) {
       let [id, accepts, derivative] = item
       yield [id, Terms.out (id), accepts, RL.toArray (derivative)]
     }
@@ -239,7 +241,7 @@ function Compiler () {
     const ts = F (([x,a,d]) => x) (fx)
     const as = F (([x,a,d]) => a) (fx)
     const ds = F (([x,a,d]) => d) (fx)
-    const x = Terms.apply (ts) // store it as a term
+    const x = inn (ts) // store it as a term
     const a = _nullable (as)
     const d = _derivative (x, ts, as, ds)
     return [x, a, d]
@@ -247,20 +249,19 @@ function Compiler () {
   
   function apply (fx) {
     const [x, a, d] = _apply (fx)
-    if (x in Memo) return Memo[x]
-    Memo[x] = [x,a,d]
-    const heap = Terms._heap
+    if (x in nodes) return nodes[x]
+    nodes[x] = [x,a,d]
 
     // The _derivative function may have generated new terms, leaving 
     // the memo map incomplete. Since the ordering of the heap is compatible
     // with the subterm order, we can simply fill it out by passing over it LTR
 
-    for (let i = Memo.length; i < heap.length; i++) {
-      const fx = F (x => Memo[x]) (heap [i])
-      Memo[i] = _apply(fx)
+    for (let i = nodes.length; i < terms.length; i++) {
+      const fx = F (x => nodes[x]) (terms [i])
+      nodes[i] = _apply(fx)
     }
 
-    return Memo[x]
+    return nodes[x]
   }
 
   // private helper function for implementing apply 
@@ -272,13 +273,13 @@ function Compiler () {
 
     switch (op) {
       case GROUP: return d1
-      case BOT:   return new Rest (Terms.bot)
+      case BOT:   return new Rest (Terms.bottom)
       case TOP:   return new Rest (Terms.top)
-      case UNIT:  return new Rest (Terms.bot)
+      case UNIT:  return new Rest (Terms.bottom)
       //case TEST:
 
       case STEP:
-        return RL.map (b => b ? Terms.unit : Terms.bot, RS.eq (d1), Terms.compare)
+        return RL.map (b => b ? Terms.unit : Terms.bottom, RS.eq (d1), Terms.compare)
 
       case NOT:
         return RL.map (Terms.not, d1)
@@ -300,14 +301,14 @@ function Compiler () {
   }
 
   function run (id, string) {
-    //log ('run\n  ===>', id, Memo[id][1])
+    //log ('run\n  ===>', id, nodes[id][1])
     for (let char of string) {
-      if (id === this.bot[0]) return { id, accepts:false }
+      if (id === this.bottom[0]) return { id, accepts:false }
       if (id === this.top[0]) return { id, accepts:true }
-      RL.lookup (char, Memo[id][2], cmp_js)
-      //log (char, '===>', id, Memo[id][1])
+      id = RL.lookup (char, nodes[id][2], cmp_js)
+      //log (char, '===>', id, nodes[id][1])
     }
-    return { id, accepts: Memo[id][1] }
+    return { id, accepts: nodes[id][1] }
   }
 
 }
