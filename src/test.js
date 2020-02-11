@@ -15,6 +15,8 @@ const samples = [
   , 'fooo*|bar|baz'
   , '!ab'
   , '!a b'
+  , '[a-z]'
+  , '[a-z][1-1]'
 ]
 
 function testParse (sample) {
@@ -26,7 +28,7 @@ function testParse (sample) {
   log (ref, store._heap)
 }
 
-samples.forEach (testParse)
+//samples.forEach (testParse)
 
 
 //
@@ -35,6 +37,7 @@ samples.forEach (testParse)
 
 const derivSamples = [
     'a' 
+  , '[a-z]'
   , '!a'
   , 'a | b'
   , 'a & b'
@@ -43,6 +46,8 @@ const derivSamples = [
   , 'a* b'
   , 'ab & ac'
   , 'abc & abd'
+  , '[a-z]'
+  , '[a-z][1-1]'
 ]
 
 function testCompiler (sample) {
@@ -71,11 +76,29 @@ function testRun (sample, input) {
   log (store.run (ref[0], input))
 }
 
-testRun ('a*b', 'aab')
-testRun ('a|b*', 'b')
-testRun ('a|b*', 'bbbb')
-testRun ('a|b*', 'ba')
-testRun ('a|b*', 'a')
-testRun ('abc* & abc', 'abcc')
-testRun ('!ab', 'ab')
 
+// testRun ('a*b', 'aab')
+// testRun ('a|b*', 'b')
+// testRun ('a|b*', 'bbbb')
+// testRun ('a|b*', 'ba')
+// testRun ('a|b*', 'a')
+// testRun ('abc* & abc', 'abcc')
+// testRun ('!ab', 'ab')
+// testRun ('[a-z]', 'hi')
+// testRun ('[a-z]*', 'abc')
+// testRun ('[a-z]*...', 'abc___')
+// testRun ('hii?', 'h')
+// testRun ('hii?', 'hi')
+// testRun ('hii?', 'hii')
+// testRun ('hi+', 'hiii')
+// testRun ('hi+', 'h')
+// testRun ('hi+', 'hi')
+// testRun ('hi+', 'hii')
+// testRun ('hi+', 'hiii')
+testRun ('(hi)+', 'h')
+testRun ('(hi)+', 'hi')
+testRun ('(hi)+', 'hih')
+testRun ('(hi)+', 'hihi')
+testRun ('(hi)+', 'hihih')
+testRun ('(hi)+', 'hihihi')
+testRun ('(hi)+', 'hihihih')

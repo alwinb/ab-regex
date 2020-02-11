@@ -9,19 +9,23 @@ const T = TokenClasses
 
 const
     R_STEP = '[a-zA-Z0-9]' //'[a-zA-Z_][a-zA-Z_0-9]*'
+  , R_ANY = '[.]'
   , R_SPACE = '[ \t\f]+'
   , R_NEWLINE = '\n'
-  , R_PREFIX = '[!*]'
+  , R_PREFIX = '[!]'
   , R_INFIX = '[&|]|(?:.{0}(?!$))'
-  , R_POSTFIX = '[*]'
+  , R_POSTFIX = '[*?+]'
+  , R_RANGE = '\\[[^\\]]-[^\\]]]'
 
 const grammar = {
   main:
     [ [ R_STEP,     'STEP',  'post' ]
+    , [ R_ANY,      'ANY',   'post' ]
     , [ R_SPACE,    'space',        ]
     , [ R_NEWLINE,  'space',        ]
     , [ R_PREFIX,   'op',           ]
-    , [ '[([]',     'start'         ] ],
+    , [ '[(]',      'start'         ]
+    , [ R_RANGE,    'RANGE', 'post' ] ], // quick test
 
   post:
     [ [ R_SPACE,    'space'         ]
@@ -42,12 +46,13 @@ const tokenize = new Lexer (grammar, 'main') .tokenize
 
 const optable =
   { '*': [  'STAR', T.POSTFIX, 0 ]
+  , '?': [   'OPT', T.POSTFIX, 0 ]
+  , '+': [  'PLUS', T.POSTFIX, 0 ]
   ,  '': [  'CONC', T.INFIXL,  1 ]
   , '!': [   'NOT', T.PREFIX,  2 ]
-  , ' ': [  'CONC', T.INFIXL,  3 ]
   , '&': [   'AND', T.INFIXL,  4 ]
-  , '|': [    'OR', T.INFIXL,  5 ]
-  }
+  , '|': [    'OR', T.INFIXL,  5 ] }
+
 
 function annotate (token, _context) {
   //log ('annotate', token, _context)
@@ -62,6 +67,7 @@ function annotate (token, _context) {
 
 
 // ## Parser
+// [Evaluator( (Parser( (parse) )_annotate) )tokenize]
 
 function parse (input, alg = x => x) {
   const rpn = new Evaluator (alg)
@@ -69,16 +75,16 @@ function parse (input, alg = x => x) {
   const verifier = new Verifier (parser)
   const _annotate = annotateWith (annotate)
 
-  let space = false
   for (let x of tokenize (input)) {
-    // hack, to have a non-space and a space concatenation operator
-    if (space && x[1] === '' && x[0] === 'op') x = ['op', ' ']
-    else if (x[0] === 'space') space = true
-    else space = false
+    if (x[0] === 'RANGE') {
+      x[2] = x[1][3]
+      x[1] = x[1][1]
+    }
     // TODO; pass the context in another way, maybe via a return value?
     const atoken = _annotate (x, verifier.context)
     verifier.write (atoken)
   }
+
   verifier.end ()
   const r = rpn.value
   rpn.value = null
@@ -94,7 +100,9 @@ function parse (input, alg = x => x) {
 var sample = 'abcd(a)|ac*left'
 var sample = 'a b|a*** c&ef'
 var sample = '(a|)(bc)'
-var sample = '(a)|[bc]'
+var sample = '(a)|[b-c]'
+var sample = '(a).b|[b-c]'
+var sample = 'a+b?c*.+|[b-c]'
 
 log (sample)
 log (...tokenize (sample))

@@ -289,39 +289,36 @@ function Compiler () {
 
   function _derivative (nodeOp, x, fx, fa) {
     const [op, r, s] = fx
+    const { top, bottom, unit, compare, conc } = Terms
 
     switch (op) { // constants
-      case BOT:  return new Rest (Terms.bottom)
-      case TOP:  return new Rest (Terms.top)
-      case UNIT: return new Rest (Terms.bottom)
-      case STEP:
-        return RL.map (b => b ? Terms.unit : Terms.bottom, RS.eq (fx[1]), Terms.compare)
+      case BOT:   return new Rest (bottom)
+      case TOP:   return new Rest (top)
+      case UNIT:  return new Rest (bottom)
+      case ANY:   return new Rest (unit)
+      case STEP:  return RL.map (b => b ? unit : bottom, RS.eq (fx[1]), compare)
+      case RANGE: return RL.merge ((x,y) => x && y ? unit : bottom, RS.gte (fx[1]), RS.lte (fx[2]), compare)
     }
 
-    const [x1, ar, dr] = nodeOp[1] // unary operations
+    const [x1, ar, drs] = nodeOp[1] // unary operations
     switch (op) {
-      case GROUP:
-        return dr
-
-      case NOT:
-        return RL.map (Terms.not, dr)
-
-      case STAR:
-        return RL.map (dr => Terms.conc (dr, x), dr)
+      case GROUP: return drs
+      case NOT:   return RL.map (Terms.not, drs, compare)
+      case STAR:  return RL.map (dr => conc (dr, x), drs, compare)
+      case OPT:   return drs // ∂(r?) = ∂(ε|r) = (∂ε|∂r) = (⊥|∂r) = ∂r
+      case PLUS:  return RL.map (dr => conc (dr, Terms.star (r)), drs)
+      // ∂(r+) = ∂(rr*) = if accepts(r) then (∂r)r* else (∂r)r* | ∂r*
+      //  else branch: ((∂r)r* | ∂r*) = ((∂r)r* | (∂r)r*) which is (∂r)r* // TODO check that (nullable?)
     }
 
-    const [x2, as, ds] = nodeOp[2] // unary operations
+    const [x2, as, dss] = nodeOp[2] // unary operations
     switch (op) {
-      case AND:
-        return RL.merge (Terms.and, dr, ds, Terms.compare)
-
-      case OR:
-        return RL.merge (Terms.or, dr, ds, Terms.compare)
+      case AND: return RL.merge (Terms.and, drs, dss, compare)
+      case OR:  return RL.merge (Terms.or,  drs, dss, compare)
 
       case CONC:
-        const left = RL.map (dr => Terms.conc (dr, s), dr, Terms.compare) // left = ∂r•s
-        return !ar ? left : RL.merge (Terms.or, left, ds, Terms.compare) // if r accepts then left, else (left + ∂s)
-      break
+        const left = RL.map (dr => conc (dr, s), drs, compare) // left = ∂r•s
+        return !ar ? left : RL.merge (Terms.or, left, dss, compare) // if r accepts then left, else (left + ∂s)
     }
   }
 
