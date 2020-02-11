@@ -11,7 +11,7 @@ const EMPTY = Node (null, null, 0, null, null)
 class AATree {
 
   constructor (compare = defaultCompare, store = EMPTY) {
-  	if (typeof compare !== 'function')
+    if (typeof compare !== 'function')
       throw new Error ('First argument to AATree must be a comparison function.')
     this.compare = compare
     this.store = store
@@ -33,11 +33,11 @@ class AATree {
   }
 
   insert (...pairs) {
-  	let r = this
+    let r = this
     const l = pairs.length
     for (let i = 0; i < l; i += 2)
-  		r = r.lookup (pairs [i]) .set (pairs [i + 1])
-  	return r
+      r = r.lookup (pairs [i]) .set (pairs [i + 1])
+    return r
   }
 }
 

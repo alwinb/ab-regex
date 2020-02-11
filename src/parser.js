@@ -39,11 +39,6 @@ const tokenize = new Lexer (grammar, 'main') .tokenize
 
 // ## Token annotation
 
-// NB. currently there are _two_ concatenation operators
-// juxtaposition; binds stronger than negation, so `!ab` == `!(ab)`
-// but justapostion with space does not, thus `!a b` == `(!a) b`
-// I may change that as I start working on a better syntax. 
-
 const optable =
   { '*': [  'STAR', T.POSTFIX, 0 ]
   , '?': [   'OPT', T.POSTFIX, 0 ]
@@ -91,22 +86,5 @@ function parse (input, alg = x => x) {
   return r
 }
 
-
-//
-//  Test
-//
-
-/*
-var sample = 'abcd(a)|ac*left'
-var sample = 'a b|a*** c&ef'
-var sample = '(a|)(bc)'
-var sample = '(a)|[b-c]'
-var sample = '(a).b|[b-c]'
-var sample = 'a+b?c*.+|[b-c]'
-
-log (sample)
-log (...tokenize (sample))
-log (JSON.stringify(parse (sample), null, 2))
-//*/
 
 module.exports = { parse, tokenize }
