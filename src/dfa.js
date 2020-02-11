@@ -1,5 +1,5 @@
 const Map = require ('./aatree')
-const Symbols = new Proxy ({}, { get:(_,k) => Symbol (k) })
+const { RangeList:RL, RangeSet:RS, Upto, Rest } = require ('./rangelist')
 const log = console.log.bind (console)
 
 //
@@ -148,119 +148,6 @@ function _normalize (out, inn, fx) {
   }
 }
 
-
-//
-// RangeLists
-
-// The one-level unfolding of a term is implemented as
-// a 'RangeList' from chars to terms. 
-
-const { BELOW, ABOVE } = Symbols
-
-class Upto {
-  constructor (key, value, tail) {
-    this.value = value
-    this.end = key
-    this.tail = tail
-  }
-}
-
-class Rest {
-  constructor (value) { 
-    this.value = value
-  }
-}
-
-const upto = (...as) =>
-  new Upto (...as)
-
-const uptoBelow = (key, value, tail) =>
-  new Upto ([BELOW, key], value, tail)
-
-const uptoAbove = (key, value, tail) =>
-  new Upto ([ABOVE, key], value, tail)
-
-const rest = (...as) =>
-  new Rest (...as)
-
-
-const compareBounds = cmpK => ([c1,x1], [c2,x2]) =>
-  cmpK (x1, x2) || (c1 === c2 ? 0 : c1 === BELOW ? -1 : 1)
-
-// Any operation 'fn' on the output lables,
-// lifts to an operation on range lists as follows:
-
-// unary operations
-
-function map (fn, xs, cmpV, cmpK) {
-  return merge (fn, xs, rest(), cmpV, cmpK) }
-
-// binary operations
-
-function merge (fn, xs1, xs2, cmpV, cmpK) {
-  var c1 = xs1.constructor
-    , c2 = xs2.constructor
-    , value = fn (xs1.value, xs2.value)
-    , merge_ = (xs1, xs2) => merge (fn, xs1, xs2, cmpV, cmpK)
-    , tail
-
-  if (c1 === Rest && c2 === Rest)
-    return rest (value)
-
-  var decide = c1 === Rest && c2 !== Rest ? 1
-      : c1 !== Rest && c2 === Rest ?  -1
-      : compareBounds (cmpK) (xs1.end, xs2.end)
-
-  if (decide < 0) {
-    tail = merge_ (xs1.tail, xs2)
-    return (cmpV (tail.value, value) === 0) ? tail
-      : upto (xs1.end, value, tail)
-  }
-
-  else if (decide === 0) {
-    tail = merge_ (xs1.tail, xs2.tail)
-    return (cmpV (tail.value, value) === 0) ? tail
-      : upto (xs1.end, value, tail)
-  }
-
-  else if (decide > 0) {
-    tail = merge_ (xs1, xs2.tail)
-    return (cmpV (tail.value, value) === 0) ? tail
-      : upto (xs2.end, value, tail)
-  }
-
-}
-
-function lookup (k, xs, cmpK) {
-  const compare = (k, [delim,k2]) => cmpK (k, k2) || (delim === ABOVE ? -1 : 1)
-  let head = xs
-  while (head instanceof Upto && compare (k, head.end) > 0)
-    head = head.tail
-  return head.value
-}
-
-// Range Sets are range lists with boolean output labels
-// This is nice because they now are a boolean algebra.
-
-const lt  = k => uptoBelow (k, true,  rest (false))
-const lte = k => uptoAbove (k, true,  rest (false))
-const eq  = k => uptoBelow (k, false, uptoAbove (k, true, rest (false)))
-const gte = k => uptoBelow (k, false, rest (true))
-const gt  = k => uptoAbove (k, false, rest (true))
-
-function* iterate (xs) {
-  while (xs.constructor !== Rest) {
-    yield xs.value
-    const [d,k] = xs.end
-    yield d === BELOW ? '|'+k : k+'|'
-    xs = xs.tail
-  }
-  yield xs.value
-}
-
-const toArray = rl => [...iterate (rl)]
-
-
 //
 //  One Level
 
@@ -326,9 +213,6 @@ function Compiler () {
   const Terms = new TermStore ()
   const Memo = [] // table for eval: X -> Y
 
-  const _map = (f, xs) => map (f, xs, cmp_js, cmp_js)
-  const _merge = (f, xs, ys) => merge (f, xs, ys, cmp_js, cmp_js)
-
   this.apply = apply
   this.bot = apply ([BOT])
   this.top = apply ([TOP])
@@ -344,7 +228,7 @@ function Compiler () {
     //log ('entries', Memo)
     for (let item of Memo) {
       let [id, accepts, derivative] = item
-      yield [id, Terms.out (id), accepts, toArray (derivative)]
+      yield [id, Terms.out (id), accepts, RL.toArray (derivative)]
     }
   }
 
@@ -388,32 +272,31 @@ function Compiler () {
 
     switch (op) {
       case GROUP: return d1
-      case UNIT:  return rest (Terms.bot)
-      case TOP:   return rest (Terms.top)
-      case BOT:   return rest (Terms.bot)
+      case BOT:   return new Rest (Terms.bot)
+      case TOP:   return new Rest (Terms.top)
+      case UNIT:  return new Rest (Terms.bot)
       //case TEST:
 
       case STEP:
-        return _map (b => b ? Terms.unit : Terms.bot, eq (d1)) 
+        return RL.map (b => b ? Terms.unit : Terms.bot, RS.eq (d1), Terms.compare)
 
       case NOT:
-        return _map (Terms.not, d1)
+        return RL.map (Terms.not, d1)
 
       case STAR:
-        return _map (dr => Terms.conc (dr, t), d1)
+        return RL.map (dr => Terms.conc (dr, t), d1)
 
       case AND:
-        return _merge (Terms.and, d1, d2)
+        return RL.merge (Terms.and, d1, d2, Terms.compare)
 
       case OR:
-        return _merge (Terms.or, d1, d2)
+        return RL.merge (Terms.or, d1, d2, Terms.compare)
 
       case CONC:
-        const left = _map (dr => Terms.conc (dr, t2), d1) // left = ∂t1•t2
-        return !a1 ? left : _merge (Terms.or, left, d2) // if t1 accepts then left, else (left + ∂t2)
+        const left = RL.map (dr => Terms.conc (dr, t2), d1, Terms.compare) // left = ∂t1•t2
+        return !a1 ? left : RL.merge (Terms.or, left, d2, Terms.compare) // if t1 accepts then left, else (left + ∂t2)
       break
       }
-
   }
 
   function run (id, string) {
@@ -421,7 +304,7 @@ function Compiler () {
     for (let char of string) {
       if (id === this.bot[0]) return { id, accepts:false }
       if (id === this.top[0]) return { id, accepts:true }
-      id = lookup (char, Memo[id][2], cmp_js)
+      RL.lookup (char, Memo[id][2], cmp_js)
       //log (char, '===>', id, Memo[id][1])
     }
     return { id, accepts: Memo[id][1] }
