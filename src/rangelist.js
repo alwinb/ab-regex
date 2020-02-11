@@ -11,19 +11,30 @@ const cmpJs = (t1, t2) =>
 
 const { BELOW, ABOVE } = Symbols
 
-class Upto {
+class RLNode {
+
+  toArray () {
+    return toArray (this)
+  }
+
+}
+
+class Upto extends RLNode {
   constructor (key, value, tail) {
+    super()
     this.value = value
     this.end = key
     this.tail = tail
   }
 }
 
-class Rest {
+class Rest extends RLNode {
   constructor (value) { 
+    super()
     this.value = value
   }
 }
+
 
 const compareBounds = cmpK => ([c1,x1], [c2,x2]) =>
   cmpK (x1, x2) || (c1 === c2 ? 0 : c1 === BELOW ? -1 : 1)

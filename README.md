@@ -1,4 +1,4 @@
 Regular Expression Engine
 =====================
 
-Work in progress. 
+Work in progress! 

@@ -1,338 +1,232 @@
-const Map = require ('./aatree')
-const { RangeList:RL, RangeSet:RS, Upto, Rest } = require ('./rangelist')
 const log = console.log.bind (console)
-
-// JavaScript's built-in total order
-
-const cmp_js = (t1, t2) =>
-  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
+const { Operators, Algebra } = require ('./signature')
+const { cmpJs, Normalised, _print } = require ('./terms')
+const { RangeList:RL, RangeSet:RS, Upto, Rest } = require ('./rangelist')
 
 //
-//  Signature
-
-const STEP  = 'STEP'
-  , ANY   = 'ANY'
-  , RANGE = 'RANGE'
-  , TOP   = 'TOP'
-  , BOT   = 'BOT'
-  , UNIT  = 'UNIT'
-  , NOT   = 'NOT'
-  , STAR  = 'STAR'
-  , OPT   = 'OPT'
-  , PLUS  = 'PLUS'
-  , AND   = 'AND'
-  , OR    = 'OR'
-  , CONC  = 'CONC'
-  , GROUP = 'GROUP'
-
-const signature =
-  { [STEP]: 0
-  , [ANY]: 0
-  , [RANGE]: 0
-  , [UNIT]: 0
-  , [TOP]: 0
-  , [BOT]: 0
-  , [GROUP]: 1
-  , [NOT]: 1
-  , [STAR]: 1
-  , [OPT]: 1
-  , [PLUS]: 1
-  , [AND]: 2
-  , [OR]: 2
-  , [CONC]: 2 }
-
-//
-//  Signature functor, morphism part
-
-const F = fn => tm => {
-  const [c, x, y] = tm
-  return (
-      c === STEP  ? tm
-    : c === ANY   ? tm
-    : c === RANGE ? tm
-    : c === UNIT  ? tm
-    : c === TOP   ? tm
-    : c === BOT   ? tm
-    : c === GROUP ? [c, fn(x)]
-    : c === NOT   ? [c, fn(x)]
-    : c === STAR  ? [c, fn(x)]
-    : c === OPT   ? [c, fn(x)]
-    : c === PLUS  ? [c, fn(x)]
-    : c === AND   ? [c, fn(x), fn(y)]
-    : c === OR    ? [c, fn(x), fn(y)]
-    : c === CONC  ? [c, fn(x), fn(y)]
-    : undefined ) }
-
-// Provided a total order on X,
-//  produces a total order on FX
-
-const compareFNode = cmp_x => (a, b) => {
-  const c = a[0], d = b[0]
-  const r = cmp_js (c, d)
-    || (c === STEP  || 0) && cmp_js (a[1], b[1])
-    || (c === RANGE || 0) && (cmp_js (a[1], b[1]) || cmp_js (a[2], b[2]))
-    || (signature [c] > 0 || 0) && cmp_x (a[1], b[1])
-    || (signature [c] > 1 || 0) && cmp_x (a[2], b[2])
-  return r }
-
-
-//
-//  Normalised term algebra
-
-// This is not a full normalisation of terms, but a preliminary simplification. 
-// I am doing this on the term algebra (initial algebra) directly,
-// on the elements of which I furthermore, use primitive js comparisons. 
-
-function _normalize (out, inn, fx) {
-  //log ('norm', fx)
-  const [op, a1, a2] = fx
-  switch (op) {
-
-    case GROUP:
-      return a1
-
-    case STEP: case ANY: case RANGE:
-      return inn (fx)
-
-    case TOP: case BOT: case UNIT:
-      return inn (fx)
-
-    case NOT: {
-      const sub = out (a1)
-      return sub[0] === NOT ? sub[1] : inn (fx)
-    }
-
-    case STAR: {
-      const sub = out (a1)
-      const [c1] = sub
-      return (
-          c1 === STAR ? a1
-        : c1 === UNIT ? a1
-        : c1 === TOP  ? a1
-        : c1 === BOT  ? inn ([UNIT])
-        : inn (fx) )
-    }
-
-    case OPT: {
-      return inn (fx)
-      // TODO optimise the '?' operator
-    }
-    case PLUS: {
-      return inn (fx)
-      // TODO optimise the '+' operator
-    }
-
-    case AND: {
-      const t1 = out (a1), t2 = out (a2)
-      const [c1] = t1, [c2] = t2
-      return (
-          c1 === TOP ? a2
-        : c2 === TOP ? a1
-        : c1 === BOT ? a1
-        : c2 === BOT ? a2
-        : a1  <  a2 ? inn ([op, a1, a2])
-        : a1 === a2 ? a1
-        : a1  >  a2 ? inn ([op, a2, a1])
-        : inn (fx) )
-    }
-
-    case OR: {
-      const t1 = out (a1), t2 = out (a2)
-      const [c1] = t1, [c2] = t2
-      return (
-          c1 === BOT ? a2
-        : c2 === BOT ? a1
-        : c1 === TOP ? a1
-        : c2 === TOP ? a2
-        : a1  <  a2 ? inn ([op, a1, a2])
-        : a1 === a2 ? a1
-        : a1  >  a2 ? inn ([op, a2, a1])
-        : inn (fx) )
-    }
+const {
+  TOP, BOT, EMPTY,
+  STEP, ANY, RANGE,
+  GROUP, STAR, OPT, PLUS, NOT,
+  AND, OR, CONC } = Operators
   
-    case CONC: {
-      const t1 = out (a1), t2 = out (a2)
-      const [c1] = t1, [c2] = t2
-      return (
-          c1 === UNIT ? a2
-        : c2 === UNIT ? a1
-        : c1 === BOT  ? a1
-        : c2 === BOT  ? a2
-        : inn (fx) )
+// One Level Unfoldings
+// These can be computed algebraically
+// depending on two algebras: 
+// Normalised terms, and 'Accepts'
+
+const Accepts = {
+  bottom: false,
+  top:    true,
+  empty:  true,
+  any:    false,
+  step:   (...args) => false,
+  range:  (...args) => false,
+  group:  (...args) => args[0],
+  star:   (...args) => true,
+  plus:   (...args) => args[0],
+  opt:    (...args) => true,
+  not:    (...args) => !args[0],
+  or:     (...args) => args.includes (true),
+  and:    (...args) => !args.includes (false),
+  conc:   (...args) => !args.includes (false),
+}
+
+// Derivs/ States is the algebra
+// based on the previously mentioned two
+
+const first = ({term}) => term
+const second = ({accepts}) => accepts
+const third = ({derivs}) => derivs
+
+function Derivs (Terms = new Normalised) {
+
+  class State {
+    constructor (term, accepts, derivs) {
+      this.id = term
+      this.term = term
+      this.accepts = accepts
+      this.derivs = derivs   // a RangeList of successor states
     }
 
-    default:
-      throw new Error ('invalid AST node ' + JSON.stringify (fx, null, 2))
-  }
-}
-
-
-//
-// Store for normalized terms
-
-function _init (apply) {
-  this.bottom = apply ([BOT])
-  this.top = apply ([TOP])
-  this.unit = apply ([UNIT])
-  this.step = c => apply ([STEP, c])
-  this.not = x => apply ([NOT, x])
-  this.star = x => apply ([STAR, x])
-  this.opt = x => apply ([OPT, x])
-  this.plus = x => apply ([PLUS, x])
-  this.and = (x, y) => apply ([AND, x, y])
-  this.or = (x, y) => apply ([OR, x, y])
-  this.conc = (x, y) => apply ([CONC, x, y])
-}
-
-function TermStore () {
-
-  let memo = new Map (compareFNode (cmp_js))
-  const heap = []
-
-  function inn (fx) {
-    return _normalize (out, _inn, fx)
+    toString () {
+      const {term, accepts, derivs} = this
+      return [
+        term,
+        _print (Terms.out, term),
+        accepts,
+        '[ '+RL.map (x => _print (Terms.out, x), derivs) .toArray ().join(' ')+' ]'
+      ].join(' ')
+    }
   }
 
-  function out (x) {
-    return heap [x]
+
+return new (class Derivs {
+
+  constructor () {
+    this.bottom = new State (Terms.bottom, Accepts.bottom, new Rest (Terms.bottom))
+    this.top    = new State (Terms.top,    Accepts.top,    new Rest (Terms.top))
+    this.empty  = new State (Terms.empty,  Accepts.empty,  new Rest (Terms.bottom))
+    this.any    = new State (Terms.any,    Accepts.any,    new Rest (Terms.empty))
+    this.apply  = Algebra.fromObject (this)
   }
 
-  function _inn (fx) {
-    const cursor = memo.select (fx)
-    if (cursor.found) return cursor.value
-    const x = heap.push (fx) - 1
-    memo = cursor.set (x)
-    return x
+  group (x) { return x }
+
+  step (char) {
+    return new State (
+      Terms.step (char),
+      Accepts.step (char),
+      RL.map (b => b ? Terms.empty : Terms.bottom, RS.eq (char), Terms.compare)
+    )
   }
 
-  //this.inn = inn
-  this.out = out
-  this.inn = inn
-  this.terms = heap
-  _init.call (this, inn)
-}
-
-
-//
-//  One Level
-
-function _nullable ([op, nr, ns]) {
-  switch (op) { 
-    // constants
-    case BOT: return false
-    case TOP: return true
-    case UNIT: return true
-    case STEP: return false
-    case ANY: return false
-    case RANGE: return false
-    // unary
-    case GROUP: return nr
-    case STAR: return true
-    case PLUS: return nr
-    case OPT: return true
-    case NOT: return !nr
-    // binary
-    case OR: return nr || ns
-    case AND: return nr && ns
-    case CONC: return nr && ns
+  range (char1, char2) {
+    return new State (
+      Terms.range (char1, char2),
+      Accepts.range (char1, char2),
+      RL.merge ((x,y) => x && y ? Terms.empty : Terms.bottom, RS.gte (char1), RS.lte (char2), Terms.compare)
+    )
   }
-}
 
-const first = ([a]) => a
-const second = ([,b]) => b
+  not ({ term, accepts, derivs }) {
+    return new State (
+      Terms.not (term),
+      Accepts.not (accepts),
+      RL.map (Terms.not, derivs, Terms.compare)
+    )
+  }
+
+  opt ({ term, accepts, derivs }) {
+    // ∂(r?) = ∂(ε|r) = (∂ε|∂r) = (⊥|∂r) = ∂r
+    return new State (
+      Terms.opt (term), 
+      Accepts.opt (accepts), 
+      derivs
+    )
+  }
+
+  star ({ term, accepts, derivs }) {
+    const starTerm = Terms.star (term)
+    return new State (
+      starTerm,
+      Accepts.star (accepts),
+      RL.map (dr => Terms.conc (dr, starTerm), derivs, Terms.compare)
+    )
+  }
+
+  plus ({ term, accepts, derivs }) {
+    // ∂(r+) = ∂(rr*) = if accepts(r) then (∂r)r* else (∂r)r* | ∂r*
+    //  else branch: ((∂r)r* | ∂r*) = ((∂r)r* | (∂r)r*) which is (∂r)r* // TODO check that (nullable?)
+    return new State (
+      Terms.plus (term),
+      Accepts.plus (accepts),
+      RL.map (dr => Terms.conc (dr, Terms.star (term)), derivs, Terms.compare)
+    )
+  }
+
+  or (...args) {
+    const derivsOr = (ds1, ds2) => RL.merge (Terms.or,  ds1, ds2, Terms.compare)
+    return new State (
+      Terms.or (...args.map (first)),
+      Accepts.or (...args.map (second)),
+      args.map(third).reduce (derivsOr)
+    )
+  }
+
+  and (left, right) {
+    return new State (
+      Terms.and (left.term, right.term),
+      Accepts.and (left.accepts, right.accepts), 
+      RL.merge (Terms.and,  left.derivs, right.derivs, Terms.compare)
+    )
+  }
+
+  conc (...args) {
+    return args.reduce (this._conc2)
+  }
+
+  // TODO check this
+  _conc2 (head, tail) {
+    const left = RL.map (dr => Terms.conc (dr, tail.term), head.derivs, Terms.compare) // left = (∂r)s
+    return new State (
+      Terms.conc (head.term, tail.term),
+      Accepts.conc (head.accepts, tail.accepts), 
+      !head.accepts ? left : RL.merge (Terms.or, left, tail.derivs, Terms.compare) // ∂(rs) = (∂r)s + nu(r)∂s
+    )
+  }
+
+})}
+
+
+// Compiler
+// ========
+// The compiler wraps around the Derivative, and Normalised (Term) algebras
+// When a one-level unfolding is computed, the derivative terms are generated
+// and stored in the normalised term store ...
 
 function Compiler () {
-  const Terms = new TermStore ()
-  const { terms, inn, out } = Terms
-  const nodes = [] // table for eval: X -> Y
 
-  const _map = (f, xs) => map (f, xs, cmp_js, cmp_js)
-  const _merge = (f, xs, ys) => merge (f, xs, ys, cmp_js, cmp_js)
+  const Terms = new Normalised ()
+  const Deltas = new Derivs (Terms)
+  const heap = Terms._heap
+  const table = []
 
-  _init.call (this, apply)
+  _catchUp ()
+
+  function _catchUp () {
+    for (let x = table.length; x < heap.length; x++) {
+      const derivsOp = Algebra.fmap (y => table[y]) (heap[x])
+      const unfold = Deltas.apply (derivsOp)
+      //log ('within Catch up to term', x, 'heap size', heap.length, [...heap.entries()], [...entries()])
+      if (x !== unfold.term) {
+        log ('got', unfold.toString (), "for term", x)
+        throw new Error ('something went wrong, id mismatch')
+      }
+      table [x] = unfold
+    }
+  }
+
+
+  function apply (fx) {
+    const term = Terms.apply (fx)
+    //const termOp = Algebra.fmap (y => heap[y]) (fx)
+    //log ('Compiler apply', fx)//, [...entries()])
+    const [nodesl, termsl] = [table, heap].map(x => x.length)
+    //log ('begin Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
+    _catchUp ()
+    //log ('end Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
+    return term
+  }
+
+  function lookup (x) {
+    return table[x]
+  }
+
+  function run (id, string = '') {
+    log ('run\n', id, table[id].term, '=>')
+    for (let char of string) {
+      if (id === Terms.bottom) return table[id]
+      if (id === Terms.top) return table[id]
+      id = RL.lookup (char, table[id].derivs, cmpJs)
+      log (char, '===>', id, table[id].accepts)
+    }
+    return table[id]
+  }
+
+  function inspect (id) {
+    return table[id].toString()
+  }
+
+  function* entries () {
+    for (let [k,item] of table.entries()) yield [k, item.toString()]
+  }
 
   this.apply = apply
   this.run = run
-
-  this.entries = function* () {
-    //log ('entries', nodes)
-    for (let item of nodes) {
-      let [id, accepts, derivative] = item
-      yield [id, Terms.out (id), accepts, RL.toArray (derivative)]
-    }
-  }
-
-  // Returns a tuple [ term-id, accepts, derivative ]
-  // where the derivative in turn is a RangeList of term-ids
-
-  function apply (nodeOp) {
-    const node = _apply (nodeOp)
-
-    // _apply may extend the `terms` array
-    // so we need to fill out the `nodes` array accordingly. 
-    // The ordering of the terms is compatible with the subterm order, 
-    // and so we do a 'fast fold' by passing over it left-to-right to catch up. 
-
-    for (let i = nodes.length; i < terms.length; i++) {
-      const nodeOp = F (x => nodes[x]) (terms [i])
-      nodes[i] = _apply (nodeOp)
-    }
-    return node
-  }
-
-  function _apply (nodeOp) {
-    const fx = F (first) (nodeOp)
-    const fa = F (second) (nodeOp)
-    const x = inn (fx)
-    return [x, _nullable(fa), _derivative (nodeOp, x, fx, fa)]
-  }
-
-  function _derivative (nodeOp, x, fx, fa) {
-    const [op, r, s] = fx
-    const { top, bottom, unit, compare, conc } = Terms
-
-    switch (op) { // constants
-      case BOT:   return new Rest (bottom)
-      case TOP:   return new Rest (top)
-      case UNIT:  return new Rest (bottom)
-      case ANY:   return new Rest (unit)
-      case STEP:  return RL.map (b => b ? unit : bottom, RS.eq (fx[1]), compare)
-      case RANGE: return RL.merge ((x,y) => x && y ? unit : bottom, RS.gte (fx[1]), RS.lte (fx[2]), compare)
-    }
-
-    const [x1, ar, drs] = nodeOp[1] // unary operations
-    switch (op) {
-      case GROUP: return drs
-      case NOT:   return RL.map (Terms.not, drs, compare)
-      case STAR:  return RL.map (dr => conc (dr, x), drs, compare)
-      case OPT:   return drs // ∂(r?) = ∂(ε|r) = (∂ε|∂r) = (⊥|∂r) = ∂r
-      case PLUS:  return RL.map (dr => conc (dr, Terms.star (r)), drs)
-      // ∂(r+) = ∂(rr*) = if accepts(r) then (∂r)r* else (∂r)r* | ∂r*
-      //  else branch: ((∂r)r* | ∂r*) = ((∂r)r* | (∂r)r*) which is (∂r)r* // TODO check that (nullable?)
-    }
-
-    const [x2, as, dss] = nodeOp[2] // unary operations
-    switch (op) {
-      case AND: return RL.merge (Terms.and, drs, dss, compare)
-      case OR:  return RL.merge (Terms.or,  drs, dss, compare)
-
-      case CONC:
-        const left = RL.map (dr => conc (dr, s), drs, compare) // left = ∂r•s
-        return !ar ? left : RL.merge (Terms.or, left, dss, compare) // if r accepts then left, else (left + ∂s)
-    }
-  }
-
-  function run (id, string) {
-    //log ('run\n  ===>', id, nodes[id][1])
-    for (let char of string) {
-      if (id === this.bottom[0]) return { id, accepts:false }
-      if (id === this.top[0]) return { id, accepts:true }
-      id = RL.lookup (char, nodes[id][2], cmp_js)
-      //log (char, '===>', id, nodes[id][1])
-    }
-    return { id, accepts: nodes[id][1] }
-  }
-
+  this.lookup = lookup
+  this.entries = entries
+  this.inspect = inspect
 }
 
-module.exports = { TermStore, Compiler }
+module.exports = { Derivs, Compiler, Normalised, _print }
