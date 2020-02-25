@@ -1,66 +1,60 @@
 const log = console.log.bind (console)
 const { tokenize, parse } = require ('../src/parser')
-const { TermStore, Compiler } = require ('../src/dfa')
+const { Shared, Normalised } = require ('../src/terms')
+const { Compiler, Derivs, _print } = require ('../src/dfa')
 const Regex = require ('../src/')
-
-//
-//  Test Parser
-//
-
-const samples = [
-   'abcd(a)|ac*left' 
-  , '(ab)*'
-  , 'a & a & ab'
-  , 'a b|a*** c&ef'
-  , 'fooo*|(bar|baz)'
-  , 'fooo*|bar|baz'
-  , '!ab'
-  , '!a b'
-  , '[a-z]'
-  , '[a-z][1-1]'
-]
-
-function testParse (sample) {
-  log ('\n', sample, '\n===================\n')
-  log ([...tokenize (sample)])
-  log (JSON.stringify (parse (sample), null, 2))
-  const store = new TermStore ()
-  const ref = parse (sample, store.apply)
-  log (ref, store._heap)
-}
-
-//samples.forEach (testParse)
-
 
 //
 //  Test Compiler
 //
 
-const derivSamples = [
-    'a' 
-  , '[a-z]'
-  , '!a'
-  , 'a | b'
-  , 'a & b'
-  , 'a*'
-  , 'ab'
-  , 'a* b'
-  , 'ab & ac'
-  , 'abc & abd'
-  , '[a-z]'
-  , '[a-z][1-1]'
+const compileSamples = [
+    'a'
+  , 'A|B'
+  , 'a|a|a', 
+  , 'a|(b|c)', 
+  // , '(a|b)|(c|d)',
+  // , '(a|b)|x|y|(c|d)',
+  // , '(A|B|C)*'
+  // , '(ab)(cd)'
+  // , '.'
+  // , '[a-z]'
+  // , '!a'
+  // , 'a | b'
+  // , 'a & b'
+  // , 'a*'
+  // , '(ab)*'
+  // , 'a+'
+  // , '(ab)+'
+  // , 'a?'
+  // , 'a?b'
+  // , '(ab)?'
+  // , 'ab'
+  // , 'ab & ac'
+  // , 'abc & abd'
+  // , '[a-z]'
+  // , '[a-z][1-1]'
+  // , 'a* b'
 ]
 
 function testCompiler (sample) {
   log ('\n', sample, '\n===================\n')
-  log ([...tokenize (sample)])
-  log (JSON.stringify (parse (sample), null, 2))
+  //log ([...tokenize (sample)])
+  //log (JSON.stringify (parse (sample), null, 2))
   const store = new Compiler ()
-  const ref = parse (sample, store.apply)
-  log (ref[0], [...store.entries ()])
+  const ref = parse (sample, store)
+  log (store.inspect (ref))
+  log (ref, [...store.entries ()])
 }
 
-// derivSamples.forEach (testCompiler)
+// var derivs = new Derivs ()
+// var r = derivs.apply (['BOT'])
+// log(derivs._inspect (r))
+// var r = derivs.apply (['TOP'])
+// log(derivs._inspect (r))
+
+//parseSamples.forEach (testParse)
+compileSamples.forEach (testCompiler)
 
 
 //
@@ -68,27 +62,28 @@ function testCompiler (sample) {
 //
 
 function testRun (sample, input) {
-  log ('\nrun', sample, input, '\n===================\n')
-  log ([...tokenize (sample)])
-  log (JSON.stringify (parse (sample), null, 2))
+  log ('\nrun', sample, '(', input, ')\n===================\n')
+  // log ([...tokenize (sample)])
+  // log (JSON.stringify (parse (sample), null, 2))
   const store = new Compiler ()
-  const ref = parse (sample, store.apply)
-  log (ref[0], [...store.entries ()])
-  log (store.run (ref[0], input))
+  const ref = parse (sample, store)
+  //log ('Runsss', ...store.nodes, ref )
+  log (ref, [...store.entries()])
+  log (store.run (ref, input))
 }
 
 
-/*
-testRun ('a*b', 'aab')
-testRun ('a|b*', 'b')
-testRun ('a|b*', 'bbbb')
-testRun ('a|b*', 'ba')
-testRun ('a|b*', 'a')
-testRun ('abc* & abc', 'abcc')
-testRun ('!ab', 'ab')
-testRun ('[a-z]', 'hi')
-testRun ('[a-z]*', 'abc')
-testRun ('[a-z]*...', 'abc___')
+//*
+//testRun ('a*b', 'aab')
+//testRun ('a|b*', 'b')
+//testRun ('a|b*', 'bbbb')
+//testRun ('a|b*', 'ba')
+//testRun ('a|b*', 'a')
+//testRun ('abc* & abc', 'abcc')
+//testRun ('!ab', 'ab')
+//testRun ('[a-z]', 'hi')
+//testRun ('[a-z]*', 'abc')
+testRun ('(a|b|c)*...', 'abc___')
 //*/
 
 /*
@@ -116,7 +111,7 @@ testRun ('(hi)+', 'hihihih')
 //  Test Regex Object
 //
 
-//*
+/*
 var r = new Regex ('ab*x')
 log (r)
 
@@ -168,3 +163,21 @@ log (r.test ('ayc'))
 log (r.test ('aac'))
 log (r.test ('acc'))
 //*/
+
+//*
+//var r = new Regex ('[0-9]+[.-.]?[0-9]+')
+//var r = new Regex ('a*bb+?*c*c+')
+var samples = [
+  'a|b|a|b',
+  'a & a',
+  'a|b|c|a|z|r|b|b|ua|b',
+  'a*a*',
+  'a*a',
+  'aa*' ]
+  for (let sample of samples) {
+    var r = new Regex (sample)
+    log (sample, r.state, [...r.store.entries()].map (([k,v]) => k === r.state ? ['==>', k, v].join(' ') : ['   ', k, v].join(' ')))
+}
+//*/
+
+

@@ -64,8 +64,8 @@ function annotate (token, _context) {
 // ## Parser
 // [Evaluator( (Parser( (parse) )_annotate) )tokenize]
 
-function parse (input, alg = x => x) {
-  const rpn = new Evaluator (alg)
+function parse (input, alg = { apply: x => x }) {
+  const rpn = new Evaluator (alg.apply.bind (alg))
   const parser = new Parser (rpn)
   const verifier = new Verifier (parser)
   const _annotate = annotateWith (annotate)

@@ -6,15 +6,21 @@ class Regex {
   
   constructor (arg = { }) {
     if (typeof arg === 'string') return new Regex ({ fromString:arg })
-    const { state = 0, store = new Compiler (), fromString = null } = arg
+    const { store = new Compiler (), fromString = null } = arg
+    const p = parse (String (fromString), store)
+    const info = store.lookup (p)
     this.store = store
-    this.state = fromString != null ? parse (String (fromString), this.store.apply) [0] : state
-    this.accepts = this.store.run (this.state, '') .accepts
+    this.state = info.id
+    this.accepts = info.accepts
+    // for imcremental runs; should be in a 'Run' object
     this.position = 0
+    Object.defineProperty (this, 'store', { enumerable: false })
+    log (this)
   }
 
   test (input) {
-    return this.store.run (this.state, input) .accepts
+    this.store.run (this.state, input) .accepts
+    return this
   }
 
   // changes the state of the regex; should rather be on a 'Run' object
@@ -23,10 +29,16 @@ class Regex {
     this.state = r.id
     this.accepts = r.accepts
     this.position += input.length
-    const { state, accepts, position } = this
-    return { state, accepts, position }
+    log ('after reduce;', this)
+    return this
   }
 
 }
 
 module.exports = Regex
+var r = new Regex ('foo | bar+')
+r.test ('barrrrr____')
+
+r.reduce ('ba')
+r.reduce ('r')
+r.reduce ('rrrrrass')
