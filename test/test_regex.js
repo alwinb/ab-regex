@@ -12,7 +12,7 @@ const compileSamples = [
     'a'
   , 'A|B'
   , 'a|a|a', 
-  , 'a|(b|c)', 
+  , 'a|(b|c)',
   // , '(a|b)|(c|d)',
   // , '(a|b)|x|y|(c|d)',
   // , '(A|B|C)*'

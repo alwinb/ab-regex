@@ -18,7 +18,7 @@ const cmpJs = (t1, t2) =>
 // Nodes themselves are simply arrays [operator, ...args]
 
 const {
-  TOP, BOT, EMPTY,
+  TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
   GROUP, STAR, OPT, PLUS, NOT,
   AND, OR, CONC } = Operators
@@ -58,7 +58,7 @@ function _printFx (out, [op, ...args]) {
 function Shared () {
 
   const out = x => this._heap [x]
-  const apply = (fx) => {
+  const apply = (...fx) => {
     //log ('Shared _apply', fx)
     const cursor = this._memo.select (fx)
     //log ('_inn', {fx, cursor, heap})
@@ -72,6 +72,11 @@ function Shared () {
   this._heap = []
   this.out = out
   this.apply = apply
+  
+  function* entries () {
+    for (let [k,item] of this._heap.entries ()) yield [k, _print (out, k), item]
+  }
+  this[Symbol.iterator] = entries.bind (this)
 
   Object.setPrototypeOf (this, Algebra.fromFunction (apply))
 }
@@ -122,6 +127,7 @@ return new (class Normalised {
 
     this.apply = Algebra.fromObject (this)
     this.out = Store.out.bind (Store)
+    this[Symbol.iterator] = Store[Symbol.iterator]
   }
 
   step (...args) {

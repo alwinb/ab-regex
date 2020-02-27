@@ -1,5 +1,4 @@
 const log = console.log.bind (console)
-const Strings = new Proxy ({}, { get:(_,k) => k })
 
 //  Signature
 
@@ -7,17 +6,29 @@ const Strings = new Proxy ({}, { get:(_,k) => k })
 // The Node 'class' is just a namespace at the moment
 // Nodes themselves are simply arrays [operator, ...args]
 
-const {
-  TOP, BOT, EMPTY,
-  STEP, ANY, RANGE,
-  GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC } = Strings
+const Operators =  {
+  TOP : "top", 
+  BOT : "bottom", 
+  EMPTY : "empty", 
+  STEP: "step", 
+  ANY : "any", 
+  RANGE : "range", 
+  GROUP: "group", 
+  STAR : "star", 
+  OPT : "opt", 
+  PLUS : "plus", 
+  NOT : "not", 
+  AND: "and", 
+  OR : "or", 
+  CONC : "conc", 
+}
 
-const Operators = {
-  TOP, BOT, EMPTY,
+const {
+  TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
   GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC }
+  AND, OR, CONC } = Operators
+
 
 const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
@@ -66,44 +77,31 @@ class Algebra {
     return cmpJs (op1, op2)
   }
 
-  static fromObject (object) { return ([op, ...args]) => (
-    // constants
-    op === BOT   ? object.bottom :
-    op === TOP   ? object.top :
-    op === EMPTY ? object.empty :
-    op === ANY   ? object.any :
-    // vars
-    op === STEP  ? object.step  (...args) :
-    op === RANGE ? object.range (...args) :
-    // unary
-    op === GROUP ? object.group (...args) :
-    op === STAR  ? object.star  (...args) :
-    op === PLUS  ? object.plus  (...args) :
-    op === OPT   ? object.opt   (...args) :
-    op === NOT   ? object.not   (...args) :
-    // binary; nary...
-    op === OR    ? object.or    (...args) :
-    op === AND   ? object.and   (...args) :
-    op === CONC  ? object.conc  (...args) :
-    undefined
-  )}
-  
+  static fromObject (object) { 
+    return (op, ...args) => false ? false
+      : op === BOT   ? object.bottom
+      : op === TOP   ? object.top
+      : op === EMPTY ? object.empty
+      : op === ANY   ? object.any
+      : object [op] (...args)
+  }
+
   static fromFunction (apply) {
     return {
-      bottom: apply ([BOT]),
-      top:    apply ([TOP]),
-      empty:  apply ([EMPTY]),
-      any:    apply ([ANY]),
-      step:   (...args) => apply ([STEP,  ...args]),
-      range:  (...args) => apply ([RANGE, ...args]),
-      group:  (...args) => apply ([GROUP, ...args]),
-      star:   (...args) => apply ([STAR,  ...args]),
-      plus:   (...args) => apply ([PLUS,  ...args]),
-      opt:    (...args) => apply ([OPT,   ...args]),
-      not:    (...args) => apply ([NOT,   ...args]),
-      or:     (...args) => apply ([OR,    ...args]),
-      and:    (...args) => apply ([AND,   ...args]),
-      conc:   (...args) => apply ([CONC,  ...args]),
+      bottom: apply (BOT),
+      top:    apply (TOP),
+      empty:  apply (EMPTY),
+      any:    apply (ANY),
+      step:   (a)    => apply (STEP,  a ),
+      range:  (a, b) => apply (RANGE, a, b),
+      group:  (r)    => apply (GROUP, r   ),
+      star:   (r)    => apply (STAR,  r   ),
+      plus:   (r)    => apply (PLUS,  r   ),
+      opt:    (r)    => apply (OPT,   r   ),
+      not:    (r)    => apply (NOT,   r   ),
+      and:    (r, s) => apply (AND,   r, s),
+      or:     (...as) => apply (OR,   ...as),
+      conc:   (...as) => apply (CONC, ...as),
     }
   }
 }

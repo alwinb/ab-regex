@@ -177,7 +177,7 @@ function Compiler () {
   function _catchUp () {
     for (let x = table.length; x < heap.length; x++) {
       const derivsOp = Algebra.fmap (y => table[y]) (heap[x])
-      const unfold = Deltas.apply (derivsOp)
+      const unfold = Deltas.apply (...derivsOp)
       //log ('within Catch up to term', x, 'heap size', heap.length, [...heap.entries()], [...entries()])
       if (x !== unfold.term) {
         log ('got', unfold.toString (), "for term", x)
@@ -188,8 +188,8 @@ function Compiler () {
   }
 
 
-  function apply (fx) {
-    const term = Terms.apply (fx)
+  function apply (...fx) {
+    const term = Terms.apply (...fx)
     //const termOp = Algebra.fmap (y => heap[y]) (fx)
     //log ('Compiler apply', fx)//, [...entries()])
     const [nodesl, termsl] = [table, heap].map(x => x.length)
