@@ -1,7 +1,7 @@
 const log = console.log.bind (console)
 const { Operators, Algebra } = require ('./signature')
-const { cmpJs, Normalised, _print } = require ('./terms')
-const { RangeList:RL, RangeSet:RS, Upto, Rest } = require ('./rangelist')
+const { Normalised, _print } = require ('./terms')
+const { RangeList, RangeSet } = require ('./rangelist')
 
 //
 const {
@@ -39,7 +39,15 @@ const first = ({term}) => term
 const second = ({accepts}) => accepts
 const third = ({derivs}) => derivs
 
-function Derivs (Terms = new Normalised) {
+const cmpJs = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
+const compareChar = cmpJs
+const CharSet = RangeSet (compareChar)
+
+
+function OneLevel (Terms = new Normalised) {
+
+  const Derivs = RangeList (compareChar, Terms.compare)
+  const print = x => _print (Terms.out, x)
 
   class State {
     constructor (term, accepts, derivs) {
@@ -50,26 +58,31 @@ function Derivs (Terms = new Normalised) {
     }
 
     toString () {
-      const {term, accepts, derivs} = this
+      const { term, accepts, derivs } = this
       return [
         term,
-        _print (Terms.out, term),
+        print (term),
         accepts,
-        '[ '+RL.map (x => _print (Terms.out, x), derivs) .toArray ().join(' ')+' ]'
-      ].join(' ')
+        `[ ${ RangeList (compareChar, cmpJs).byMapping (print, derivs) } ]`
+        //derivs.toString ()
+      ] .join (' ')
     }
   }
 
+//
+//  And not that this works
+//  want to normalise the delimiters
+//
 
-return new (class Derivs {
+return new (class OneLevel {
 
   constructor () {
-    this.bottom = new State (Terms.bottom, Accepts.bottom, new Rest (Terms.bottom))
-    this.top    = new State (Terms.top,    Accepts.top,    new Rest (Terms.top))
-    this.empty  = new State (Terms.empty,  Accepts.empty,  new Rest (Terms.bottom))
-    this.any    = new State (Terms.any,    Accepts.any,    new Rest (Terms.empty))
+    this.bottom = new State (Terms.bottom, Accepts.bottom, Derivs.fromConstant (Terms.bottom))
+    this.top    = new State (Terms.top,    Accepts.top,    Derivs.fromConstant (Terms.top))
+    this.empty  = new State (Terms.empty,  Accepts.empty,  Derivs.fromConstant (Terms.bottom))
+    this.any    = new State (Terms.any,    Accepts.any,    Derivs.fromConstant (Terms.empty))
     this.apply  = Algebra.fromObject (this)
-  }
+      }
 
   group (x) { return x }
 
@@ -77,7 +90,7 @@ return new (class Derivs {
     return new State (
       Terms.step (char),
       Accepts.step (char),
-      RL.map (b => b ? Terms.empty : Terms.bottom, RS.eq (char), Terms.compare)
+      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (char))
     )
   }
 
@@ -85,7 +98,7 @@ return new (class Derivs {
     return new State (
       Terms.range (char1, char2),
       Accepts.range (char1, char2),
-      RL.merge ((x,y) => x && y ? Terms.empty : Terms.bottom, RS.gte (char1), RS.lte (char2), Terms.compare)
+      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (char1, char2))
     )
   }
 
@@ -93,7 +106,7 @@ return new (class Derivs {
     return new State (
       Terms.not (term),
       Accepts.not (accepts),
-      RL.map (Terms.not, derivs, Terms.compare)
+      Derivs.byMapping (Terms.not, derivs)
     )
   }
 
@@ -111,7 +124,7 @@ return new (class Derivs {
     return new State (
       starTerm,
       Accepts.star (accepts),
-      RL.map (dr => Terms.conc (dr, starTerm), derivs, Terms.compare)
+      Derivs.byMapping (dr => Terms.conc (dr, starTerm), derivs)
     )
   }
 
@@ -121,16 +134,16 @@ return new (class Derivs {
     return new State (
       Terms.plus (term),
       Accepts.plus (accepts),
-      RL.map (dr => Terms.conc (dr, Terms.star (term)), derivs, Terms.compare)
+      Derivs.byMapping (dr => Terms.conc (dr, Terms.star (term)), derivs)
     )
   }
 
   or (...args) {
-    const derivsOr = (ds1, ds2) => RL.merge (Terms.or,  ds1, ds2, Terms.compare)
+    const derivsOr = (ds1, ds2) => Derivs.byMerging (Terms.or,  ds1, ds2)
     return new State (
       Terms.or (...args.map (first)),
       Accepts.or (...args.map (second)),
-      args.map(third).reduce (derivsOr)
+      args.map (third) .reduce (derivsOr)
     )
   }
 
@@ -138,7 +151,7 @@ return new (class Derivs {
     return new State (
       Terms.and (left.term, right.term),
       Accepts.and (left.accepts, right.accepts), 
-      RL.merge (Terms.and,  left.derivs, right.derivs, Terms.compare)
+      Derivs.byMerging (Terms.and, left.derivs, right.derivs)
     )
   }
 
@@ -148,11 +161,11 @@ return new (class Derivs {
 
   // TODO check this
   _conc2 (head, tail) {
-    const left = RL.map (dr => Terms.conc (dr, tail.term), head.derivs, Terms.compare) // left = (∂r)s
+    const left = Derivs.byMapping (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
     return new State (
       Terms.conc (head.term, tail.term),
       Accepts.conc (head.accepts, tail.accepts), 
-      !head.accepts ? left : RL.merge (Terms.or, left, tail.derivs, Terms.compare) // ∂(rs) = (∂r)s + nu(r)∂s
+      !head.accepts ? left : Derivs.byMerging (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
     )
   }
 
@@ -168,10 +181,10 @@ return new (class Derivs {
 function Compiler () {
 
   const Terms = new Normalised ()
-  const Deltas = new Derivs (Terms)
+  const Deltas = new OneLevel (Terms)
   const heap = Terms._heap
   const table = []
-
+  this._table = table
   _catchUp ()
 
   function _catchUp () {
@@ -180,7 +193,7 @@ function Compiler () {
       const unfold = Deltas.apply (...derivsOp)
       //log ('within Catch up to term', x, 'heap size', heap.length, [...heap.entries()], [...entries()])
       if (x !== unfold.term) {
-        log ('got', unfold.toString (), "for term", x)
+        log ('got', unfold, "for term", x)
         throw new Error ('something went wrong, id mismatch')
       }
       table [x] = unfold
@@ -200,7 +213,7 @@ function Compiler () {
   }
 
   function lookup (x) {
-    return table[x]
+    return table [x]
   }
 
   function run (id, string = '') {
@@ -208,18 +221,18 @@ function Compiler () {
     for (let char of string) {
       if (id === Terms.bottom) return table[id]
       if (id === Terms.top) return table[id]
-      id = RL.lookup (char, table[id].derivs, cmpJs)
+      id = table[id].derivs.lookup (char)
       log (char, '===>', id, table[id].accepts)
     }
     return table[id]
   }
 
   function inspect (id) {
-    return table[id].toString()
+    return table [id] .toString ()
   }
 
   function* entries () {
-    for (let [k,item] of table.entries()) yield [k, item.toString()]
+    for (let [k,item] of table.entries()) yield [k, item.toString ()]
   }
 
   this.apply = apply
@@ -229,4 +242,4 @@ function Compiler () {
   this.inspect = inspect
 }
 
-module.exports = { Derivs, Compiler, Normalised, _print }
+module.exports = { OneLevel, Compiler, Normalised, _print }

@@ -1,7 +1,7 @@
 const log = console.log.bind (console)
 const { tokenize, parse } = require ('../src/parser')
 const { Shared, Normalised } = require ('../src/terms')
-const { Compiler, Derivs, _print } = require ('../src/dfa')
+const { Compiler, OneLevel, _print } = require ('../src/dfa')
 const Regex = require ('../src/')
 
 //
@@ -43,11 +43,11 @@ function testCompiler (sample) {
   //log (JSON.stringify (parse (sample), null, 2))
   const store = new Compiler ()
   const ref = parse (sample, store)
-  log (store.inspect (ref))
+  //log (store.inspect (ref))
   log (ref, [...store.entries ()])
 }
 
-// var derivs = new Derivs ()
+// var derivs = new OneLevel ()
 // var r = derivs.apply (['BOT'])
 // log(derivs._inspect (r))
 // var r = derivs.apply (['TOP'])

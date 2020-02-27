@@ -2,7 +2,6 @@ const log = console.log.bind (console)
 const Strings = new Proxy ({}, { get:(_,k) => k })
 const Map = require ('./aatree')
 const { Algebra, Operators } = require ('./signature')
-const { RangeList:RL, RangeSet:RS, Upto, Rest } = require ('./rangelist')
 
 //
 //  Basic utilities
@@ -72,7 +71,7 @@ function Shared () {
   this._heap = []
   this.out = out
   this.apply = apply
-  
+
   function* entries () {
     for (let [k,item] of this._heap.entries ()) yield [k, _print (out, k), item]
   }
@@ -193,7 +192,7 @@ return new (class Normalised {
   }
 
   _or2 (a1, a2) {
-    const { opt } = Store
+    const opt = this.opt.bind (this)
     if (a1 === top) return top          // ⊤ | r = ⊤
     if (a2 === top) return top          // r | ⊤ = ⊤
     if (a1 === bottom) return a2        // r | ⊥ = r
@@ -209,7 +208,6 @@ return new (class Normalised {
       return op === OR ? as : [a] }
 
     const disjuncts = [...zip (expand (a1), expand (a2))]
-    //log ({ disjuncts })
     return disjuncts.length === 1 ? disjuncts[0]
       : Store.or (...disjuncts)
   }

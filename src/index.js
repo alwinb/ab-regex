@@ -6,7 +6,7 @@ class Regex {
   
   constructor (arg = { }) {
     if (typeof arg === 'string') return new Regex ({ fromString:arg })
-    const { store = new Compiler (), fromString = null } = arg
+    const { store = new Compiler (), fromString = '' } = arg
     const p = parse (String (fromString), store)
     const info = store.lookup (p)
     this.store = store
@@ -36,9 +36,13 @@ class Regex {
 }
 
 module.exports = Regex
-var r = new Regex ('foo | bar+')
-r.test ('barrrrr____')
+// var r = new Regex ('foo | bar+')
+// r.test ('barrrrr____')
+//
+// r.reduce ('ba')
+// r.reduce ('r')
+// r.reduce ('rrrrrass')
 
-r.reduce ('ba')
-r.reduce ('r')
-r.reduce ('rrrrrass')
+
+//new Regex ('[a-z]|b')
+new Regex ('a|[a-a]')
