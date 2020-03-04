@@ -1,7 +1,8 @@
+"use strict"
 const log = console.log.bind (console)
 const Strings = new Proxy ({}, { get:(_,k) => k })
-const Map = require ('./aatree')
-const { Algebra, Operators } = require ('./signature')
+const Map = require ('./aatree.js')
+const { Algebra, Operators } = require ('./signature.js')
 
 //
 //  Basic utilities
@@ -19,7 +20,7 @@ const cmpJs = (t1, t2) =>
 const {
   TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
-  GROUP, STAR, OPT, PLUS, NOT,
+  GROUP, REPEAT, NOT,
   AND, OR, CONC } = Operators
 
 //log (["_n00", "_aap", "_baa", "_6aaas"].sort(_compareArgs(cmpJs)))
@@ -42,13 +43,19 @@ function _printFx (out, [op, ...args]) {
     : op === BOT   ? '⊥'
     : op === GROUP ?  `(${p(a)})`
     : op === NOT   ?  `(!${p(a)})`
-    : op === STAR  ?  `(${p(a)}*)`
-    : op === OPT   ?  `(${p(a)}?)`
-    : op === PLUS  ?  `(${p(a)}+)`
+    : op === REPEAT ? `(${p(a)}${printRepeat(args[1], args[2])})`
     : op === AND   ?  `(${ args .map (p) .join (' & ') })`
     : op === OR    ?  `(${ args .map (p) .join (' | ') })`
     : op === CONC  ?  `(${ args .map (p) .join ('')    })`
     : '' ) }
+
+function printRepeat (l, m) {
+  return l === 0 && m === Infinity ? '*'
+    : l === 1 && m === Infinity ? '+'
+    : l === 0 && m === 1 ? '?'
+    : m === Infinity ? '<'+l+'-*>'
+    : '<'+l+'-'+m+'>'
+}
 
 
 // Shared term store
@@ -84,7 +91,6 @@ function Shared () {
 // Normalised term store
 // =====================
 
-
 // 'zip' is used in the normalisation of nested disjunctions
 // ... it zips together two ordered lists, maintaining order and removing duplicates
 
@@ -116,7 +122,7 @@ return new (class Normalised {
     this._heap = Store._heap
     this.compare = cmpJs
 
-    for (let op of ['and', 'or', 'not', 'star', 'plus', 'conc']) // HACK...
+    for (let op of ['and', 'or', 'not', 'conc', 'repeat']) // HACK...
       this[op] = this[op].bind (this)
 
     this.top = top
@@ -146,35 +152,30 @@ return new (class Normalised {
     return c === NOT ? a11 : Store.not (a1) // !!r == r
   }
 
-  star (a1) {
-    const [c] = Store.out (a1)
-    return a1 === empty ? empty         // ε* = ε
-      : a1 === top ? top                // ⊤* = ⊤
-      : a1 === any ? top                // .* = ⊤
-      : a1 === bottom ? empty           // ⊥* = ε
-      : c === STAR ? a1                 // a** = a*
-      : c === PLUS ? a1                 // a+* = a*
-      : Store.star (a1)
-  }
-  
-  plus (a1) {
-    const [c] = Store.out (a1)
-    return a1 === empty ? empty         // ε+ = εε*  = ε
-      : a1 === top ? top                // ⊤+ = ⊤⊤*  = ⊤
-      : a1 === bottom ? bottom          // ⊥+ = ⊥⊥*  = ⊥
-      : c === STAR ? a1                 // a*+ = a*a** = a*
-      : c === PLUS ? a1                 // a++ = a+a+* = a+
-      : Store.plus (a1)
-  }
-  
-  opt (a1) {
-    const [c,a11] = Store.out (a1)
-    return a1 === empty ? empty         // ε? = ε|ε = ε
-      : a1 === top ? top                // ⊤? = ε|⊤ = ⊤
-      : a1 === bottom ? empty           // ⊥? = ε|⊥ = ε
-      : c === STAR ? a1                 // r*? = r*
-      : c === PLUS ? Store. star (a11)  // r+? = r*
-      : Store.opt (a1)
+  // star, opt, plus, are going to be unified
+  // a? = a<0,1> a* = a<0,inf>  a+ = a<1,inf>
+
+  repeat (a1, least, most) {
+    // _<0,0> => epsilon
+    // a<1,1> => a
+    // .<0,inf> => top
+    // _<inf,inf> => bottom
+    const [c,x,l,m] = Store.out (a1)
+    const ordTimes = (a,b) => a && b && a * b
+    return most === 0 ? empty
+      : least === Infinity ? bottom 
+      : least === 1 && most === 1 ? a1
+      : a1 === any && least === 0 && most === Infinity ? top
+      : a1 === empty ? empty
+      : a1 === top ? top
+      : a1 === bottom ? bottom
+      : c === REPEAT ? Store.repeat (x, ordTimes (least * l), ordTimes (most * m))
+      : Store.repeat (a1, least, most)
+    // empty<l,m> = empty = _<0,0>
+    // top<l,m> => if l === 0 empty else top
+    // bot<l,m> => if l === 0 empty else bot
+    // any<l,m> => if l === 0, m === inf then top
+    //a<l,m><l2,m2> = a<l1*l2,m*m2>
   }
 
   and (a1, a2) {
@@ -192,13 +193,13 @@ return new (class Normalised {
   }
 
   _or2 (a1, a2) {
-    const opt = this.opt.bind (this)
+    const repeat = this.repeat.bind (this)
     if (a1 === top) return top          // ⊤ | r = ⊤
     if (a2 === top) return top          // r | ⊤ = ⊤
     if (a1 === bottom) return a2        // r | ⊥ = r
     if (a2 === bottom) return a1        // ⊥ | r = r
-    if (a1 === empty) return opt (a2)   // ε | r = r?
-    if (a2 === empty) return opt (a1)   // r | ε = r?
+    if (a1 === empty) return repeat (a2, 0, 1) // ε | r = r?
+    if (a2 === empty) return repeat (a1, 0, 1) // r | ε = r?
 
     // (r | s) | t  =  r | (s | t) = OR { r, s, t }
     // (r | s) | (t | u) = OR { r, s, t, u }
@@ -213,6 +214,7 @@ return new (class Normalised {
   }
 
   conc (...args) {
+    //log ('normalize conc', args)
     // ε r = r ε = r
     // ⊥ r = r ⊥ = ⊥
     const concs = []
@@ -223,7 +225,9 @@ return new (class Normalised {
       if (c === CONC) concs.push (...as)
       else concs.push (a)
     }
-    return concs.length === 1 ? concs[0] : Store.conc (...concs)
+    return !concs.length ? empty
+      : concs.length === 1 ? concs[0]
+      : Store.conc (...concs)
     //////////////
 
     if (a1 === bottom) return bottom

@@ -7,27 +7,28 @@ const log = console.log.bind (console)
 // Nodes themselves are simply arrays [operator, ...args]
 
 const Operators =  {
-  TOP : "top", 
-  BOT : "bottom", 
-  EMPTY : "empty", 
-  STEP: "step", 
-  ANY : "any", 
-  RANGE : "range", 
-  GROUP: "group", 
-  STAR : "star", 
-  OPT : "opt", 
-  PLUS : "plus", 
-  NOT : "not", 
-  AND: "and", 
-  OR : "or", 
-  CONC : "conc", 
+  TOP : 'top', 
+  BOT : 'bottom', 
+  EMPTY : 'empty', 
+  STEP: 'step', 
+  ANY : 'any', 
+  RANGE : 'range', 
+  GROUP: 'group', 
+  REPEAT : 'repeat', 
+  STAR : 'star', 
+  OPT : 'opt', 
+  PLUS : 'plus', 
+  NOT : 'not', 
+  AND: 'and', 
+  OR : 'or', 
+  CONC : 'conc', 
 }
 
 const {
   TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
   GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC } = Operators
+  AND, OR, CONC, REPEAT } = Operators // TODO; adding repeat everywhere..
 
 
 const cmpJs = (t1, t2) =>
@@ -51,11 +52,12 @@ class Algebra {
   static fmap (fn) { return tm => {
     const [c, ...args] = tm
     return c === STEP  ? tm
-      : c === ANY   ? tm
-      : c === RANGE ? tm
+      : c === ANY    ? tm
+      : c === RANGE  ? tm
       : c === EMPTY  ? tm
-      : c === TOP   ? tm
-      : c === BOT   ? tm
+      : c === TOP    ? tm
+      : c === BOT    ? tm
+      : c === REPEAT ? [c, fn (args[0]), args[1], args[2]]
       : [c, ...args.map (fn)] }
   }
 
@@ -67,6 +69,7 @@ class Algebra {
     const r = Algebra.compareOperator (c, d)
       || (c === STEP  && 0 || cmpJs (a[1], b[1]))
       || (c === RANGE && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
+      || (c === REPEAT && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
       || _compareArgs (compareElement) (a, b)
     return r }
   }
@@ -92,14 +95,15 @@ class Algebra {
       top:    apply (TOP),
       empty:  apply (EMPTY),
       any:    apply (ANY),
-      step:   (a)    => apply (STEP,  a ),
-      range:  (a, b) => apply (RANGE, a, b),
-      group:  (r)    => apply (GROUP, r   ),
-      star:   (r)    => apply (STAR,  r   ),
-      plus:   (r)    => apply (PLUS,  r   ),
-      opt:    (r)    => apply (OPT,   r   ),
-      not:    (r)    => apply (NOT,   r   ),
-      and:    (r, s) => apply (AND,   r, s),
+      step:   (a)     => apply (STEP,  a ),
+      range:  (a, b)  => apply (RANGE, a, b),
+      group:  (r)     => apply (GROUP, r   ),
+      repeat: (r,l,m) => apply (REPEAT, r, l, m),
+      star:   (r)     => apply (STAR,  r   ),
+      plus:   (r)     => apply (PLUS,  r   ),
+      opt:    (r)     => apply (OPT,   r   ),
+      not:    (r)     => apply (NOT,   r   ),
+      and:    (r, s)  => apply (AND,   r, s),
       or:     (...as) => apply (OR,   ...as),
       conc:   (...as) => apply (CONC, ...as),
     }

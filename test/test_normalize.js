@@ -7,6 +7,12 @@ const { Shared, Normalised, _print } = require ('../src/terms')
 //
 
 var parseSamples = [
+
+  , 'a<0-1>'
+  , 'a<0-0>'
+  , 'a<0-*>'
+  , 'a<1-*>'
+
   , '⊤',
   , '⊥',
   , '.',
@@ -42,6 +48,13 @@ function testParse (sample) {
 //
 
 var normalizeSamples = [
+  'a<0-1>',
+  'a<0-0>',
+  'a<0-*>',
+  'a<1-*>',
+  'a<2-3>',
+  'a<2-3><1-2>',
+
   'a',
   '⊤',
   '⊥',

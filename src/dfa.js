@@ -1,15 +1,8 @@
 const log = console.log.bind (console)
-const { Operators, Algebra } = require ('./signature')
+const { Algebra } = require ('./signature')
 const { Normalised, _print } = require ('./terms')
 const { RangeList, RangeSet } = require ('./rangelist')
 
-//
-const {
-  TOP, BOT, EMPTY,
-  STEP, ANY, RANGE,
-  GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC } = Operators
-  
 // One Level Unfoldings
 // These can be computed algebraically
 // depending on two algebras: 
@@ -23,9 +16,7 @@ const Accepts = {
   step:   (...args) => false,
   range:  (...args) => false,
   group:  (...args) => args[0],
-  star:   (...args) => true,
-  plus:   (...args) => args[0],
-  opt:    (...args) => true,
+  repeat: (a0, l,m) => l === 0 ? true : a0,
   not:    (...args) => !args[0],
   or:     (...args) => args.includes (true),
   and:    (...args) => !args.includes (false),
@@ -110,31 +101,15 @@ return new (class OneLevel {
     )
   }
 
-  opt ({ term, accepts, derivs }) {
-    // ∂(r?) = ∂(ε|r) = (∂ε|∂r) = (⊥|∂r) = ∂r
+  repeat ({ term, accepts, derivs }, least, most) {
+    //log ('repeat', term, derivs.toString(), least, most)
+    const repeatTerm = Terms.repeat (term, Math.max(least-1, 0), most-1)
+    //log ('repeatTerm',  Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs).toString())
     return new State (
-      Terms.opt (term), 
-      Accepts.opt (accepts), 
-      derivs
-    )
-  }
-
-  star ({ term, accepts, derivs }) {
-    const starTerm = Terms.star (term)
-    return new State (
-      starTerm,
-      Accepts.star (accepts),
-      Derivs.byMapping (dr => Terms.conc (dr, starTerm), derivs)
-    )
-  }
-
-  plus ({ term, accepts, derivs }) {
-    // ∂(r+) = ∂(rr*) = if accepts(r) then (∂r)r* else (∂r)r* | ∂r*
-    //  else branch: ((∂r)r* | ∂r*) = ((∂r)r* | (∂r)r*) which is (∂r)r* // TODO check that (nullable?)
-    return new State (
-      Terms.plus (term),
-      Accepts.plus (accepts),
-      Derivs.byMapping (dr => Terms.conc (dr, Terms.star (term)), derivs)
+      Terms.repeat (term, least, most),
+      Accepts.repeat (accepts, least, most),
+      Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs)
+      // ∂r<l,m> = ∂r<max(l-1, 0), m-1>
     )
   }
 
@@ -156,6 +131,7 @@ return new (class OneLevel {
   }
 
   conc (...args) {
+    //log ('conc', args)
     return args.reduce (this._conc2)
   }
 

@@ -45,4 +45,5 @@ module.exports = Regex
 
 
 //new Regex ('[a-z]|b')
-new Regex ('a|[a-a]')
+//new Regex ('a|[a-a]')
+//new Regex('a<3-5>').test ('aaaaaa')

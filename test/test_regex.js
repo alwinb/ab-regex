@@ -10,9 +10,15 @@ const Regex = require ('../src/')
 
 const compileSamples = [
     'a'
+  , 'a<0-1>'
+  , 'a<0-0>'
+  , 'a<0-*>'
+  , 'a<1-*>'
+  , 'a<2-3>'
+  , 'a<2-3><1-2>'
   , 'A|B'
-  , 'a|a|a', 
-  , 'a|(b|c)',
+  , 'a|a|a'
+  , 'a|(b|c)'
   // , '(a|b)|(c|d)',
   // , '(a|b)|x|y|(c|d)',
   // , '(A|B|C)*'
