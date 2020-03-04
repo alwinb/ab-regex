@@ -14,8 +14,10 @@ const compareBounds = cmpK => ([c1,x1], [c2,x2]) =>
 
 
 function RangeList (compareKey, compareValue) {
+
   if (typeof compareKey !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareKey function.')
+
   if (typeof compareValue !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareValue function.')
 
@@ -81,7 +83,7 @@ function RangeSet (compareElement) {
   const compareBoolean = (a, b) => !a ? !b ? 0 : -1 : b ? 0 : 1
   class RangeSet extends RangeList (compareElement, compareBoolean) {
 
-    static get full () {
+    get full () {
       return new RangeSet (new Rest (true))
     }
 

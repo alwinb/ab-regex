@@ -49,8 +49,8 @@ function testCompiler (sample) {
   //log (JSON.stringify (parse (sample), null, 2))
   const store = new Compiler ()
   const ref = parse (sample, store)
-  //log (store.inspect (ref))
-  log (ref, [...store.entries ()])
+  //log (store._inspect (ref))
+  log (ref, [...store._inspect ()])
 }
 
 // var derivs = new OneLevel ()
@@ -74,7 +74,7 @@ function testRun (sample, input) {
   const store = new Compiler ()
   const ref = parse (sample, store)
   //log ('Runsss', ...store.nodes, ref )
-  log (ref, [...store.entries()])
+  log (ref, [...store._inspect()])
   log (store.run (ref, input))
 }
 
@@ -182,7 +182,7 @@ var samples = [
   'aa*' ]
   for (let sample of samples) {
     var r = new Regex (sample)
-    log (sample, r.state, [...r.store.entries()].map (([k,v]) => k === r.state ? ['==>', k, v].join(' ') : ['   ', k, v].join(' ')))
+    log (sample, r.state, [...r.store].map (([k,v]) => k === r.state ? ['==>', k, v].join(' ') : ['   ', k, v].join(' ')))
 }
 //*/
 

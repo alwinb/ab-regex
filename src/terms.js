@@ -235,6 +235,7 @@ return new (class Normalised {
     if (a1 === empty) return a2
     if (a2 === empty) return a1
 
+    // TODO: these rules
     // r* r* = r*
     // r* r+ = r+
     // r+ r* = r+
@@ -242,18 +243,7 @@ return new (class Normalised {
     // r* r  = r+
     // r  r* = r+
     // r+ r  = rr+
-
     // (r s) t = r (s t)
-    /* TODO
-    const [c1, a11] = this.out (a1), [c2, a21] = this.out (a2)
-    return = c1 === STAR && c2 === STAR && a11 === a21 ? a1
-      : c1 === STAR && c2 === PLUS && a11 === a21 ? a2
-      : c1 === PLUS && c2 === STAR && a11 === a21 ? a1
-      : c1 === PLUS && c2 === PLUS && a11 === a21 ? Store.conc (a1, a2)
-      : c1 === STAR && a11 === a2 ? Store.plus (a2)
-      : c2 === STAR && a1 === a21 ? Store.plus (a1)
-      : c1 === PLUS && a11 === a2 ? Store.conc (a2, a1)
-      : Store.conc (a1, a2)*/
   }
 
 
