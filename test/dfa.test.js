@@ -9,38 +9,28 @@ const Regex = require ('../src/')
 //
 
 const compileSamples = [
-    'a'
-  , 'a<0-1>'
-  , 'a<0-0>'
-  , 'a<0-*>'
-  , 'a<1-*>'
-  , 'a<2-3>'
-  , 'a<2-3><1-2>'
-  , 'A|B'
-  , 'a|a|a'
-  , 'a|(b|c)'
-  // , '(a|b)|(c|d)',
-  // , '(a|b)|x|y|(c|d)',
-  // , '(A|B|C)*'
-  // , '(ab)(cd)'
-  // , '.'
-  // , '[a-z]'
-  // , '!a'
-  // , 'a | b'
-  // , 'a & b'
-  // , 'a*'
-  // , '(ab)*'
-  // , 'a+'
-  // , '(ab)+'
-  // , 'a?'
-  // , 'a?b'
-  // , '(ab)?'
-  // , 'ab'
-  // , 'ab & ac'
-  // , 'abc & abd'
-  // , '[a-z]'
-  // , '[a-z][1-1]'
-  // , 'a* b'
+
+  // Constants and literals
+
+  // '⊤',
+  // '⊥',
+  // 'ε',
+  // '.',
+  // 'a',
+
+  // Disjunction
+
+  'a|a|a',
+  'a|(b|c)',
+  '(a|b)|(c|d)',
+
+  // Testing CONC normalisation
+
+  'aa',
+  'a+a',
+  'aa*',
+  'aa+aa',
+  'a+a+',
 ]
 
 function testCompiler (sample) {
