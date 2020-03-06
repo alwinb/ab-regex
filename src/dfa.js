@@ -36,7 +36,7 @@ const compareChar = cmpJs
 const CharSet = RangeSet (compareChar)
 
 
-function OneLevel (Terms = new Normalised) {
+function OneLevel (Terms = new Normalised ()) {
 
   const Derivs = RangeList (compareChar, Terms.compare)
   const print = x => _print (Terms.out, x)
@@ -79,7 +79,13 @@ function OneLevel (Terms = new Normalised) {
     this.empty  = new State (Terms.empty,  Accepts.empty,  Derivs.fromConstant (Terms.bottom))
     this.any    = new State (Terms.any,    Accepts.any,    Derivs.fromConstant (Terms.empty))
     this.apply  = Algebra.fromObject (this)
-      }
+    
+    this._heap = Terms._heap
+  }
+
+  *[Symbol.iterator] () {
+    yield* Terms._heap
+  }
 
   group (x) { return x }
 
@@ -119,13 +125,21 @@ function OneLevel (Terms = new Normalised) {
     )
   }
 
-  or (...args) {
-    const derivsOr = (ds1, ds2) => Derivs.byMerging (Terms.or,  ds1, ds2)
+  or (left, right, ...rest) {
     return new State (
-      Terms.or (...args.map (first)),
-      Accepts.or (...args.map (second)),
-      args.map (third) .reduce (derivsOr)
+      Terms.or (left.term, right.term),
+      Accepts.or (left.accepts, right.accepts), 
+      Derivs.byMerging (Terms.or, left.derivs, right.derivs)
     )
+  }
+  
+  or_n (...args) {
+    // OK so this is the issue,
+    // reduce generates new terms, because,
+    // it recomputes terms, and the or_n has an order
+    // that is not in the store already in left-assoc grouping of the args/ids.
+    // But this whole thing, is messy, this recomputing of terms as state-id. 
+    return args.reduce (this.or.bind(this))
   }
 
   and (left, right) {
@@ -177,9 +191,9 @@ function Compiler (Terms = new Normalised) {
       for (let x = states.length; x < heap.length; x++) {
         const derivsOp = Algebra.fmap (y => states[y]) (heap[x])
         const unfold = Deltas.apply (...derivsOp)
-        //log ('within Catch up to term', x, 'heap size', heap.length, [...heap.entries()], [...entries()])
         if (x !== unfold.term) {
-          log ('got', unfold, "for term", x)
+          log ('got', unfold+'', "for term", x)
+          log ('within Catch up to term', x, 'heap size', heap.length, [...Terms], [...this._inspect()])
           throw new Error ('something went wrong, id mismatch')
         }
         states [x] = unfold
@@ -190,7 +204,7 @@ function Compiler (Terms = new Normalised) {
       try {
         const term = Terms.apply (...fx)
         //const termOp = Algebra.fmap (y => heap[y]) (fx)
-        //log ('Compiler apply', fx)//, [...entries()])
+        log ('Compiler apply', fx)//, [...entries()])
         const [nodesl, termsl] = [states, heap].map(x => x.length)
         //log ('begin Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
         this._catchUp ()
@@ -199,7 +213,8 @@ function Compiler (Terms = new Normalised) {
       }
       catch (e) {
         log ('Error in Compiler.apply', json (fx[0]), fx.slice (1))
-        log ([...this._inspect()])
+        log ('Store', [...Terms])
+        log ('Derivs', [...this._inspect()])
         throw (e)
       }
     }

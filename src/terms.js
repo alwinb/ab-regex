@@ -21,7 +21,7 @@ const {
   TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
   GROUP, REPEAT, NOT,
-  AND, OR, CONC } = Operators
+  AND, OR, CONC, OR_N, CONC_N } = Operators
 
 //log (["_n00", "_aap", "_baa", "_6aaas"].sort(_compareArgs(cmpJs)))
 
@@ -47,6 +47,8 @@ function _printFx (out, [op, ...args]) {
     : op === AND   ?  `(${ args .map (p) .join (' & ') })`
     : op === OR    ?  `(${ args .map (p) .join (' | ') })`
     : op === CONC  ?  `(${ args .map (p) .join ('')    })`
+    : op === OR_N  ?  `(${ args .map (p) .join (' | ') })`
+    : op === CONC_N ? `(${ args .map (p) .join ('')    })`
     : '' ) }
 
 function printRepeat (l, m) {
@@ -226,13 +228,23 @@ return new (class Normalised {
     // (r | s) | t  =  r | (s | t) = OR{ r, s, t }
     // (r | s) | (t | u) = OR { r, s, t, u }
 
+    //log ('or', a1, a2)
     const expand = a => {
       let [op, ...as] = Store.out (a)
       return op === OR ? as : [a] }
 
+    //log ('expand', expand (a1), expand (a2))
+
     const disjuncts = OrSemiLattice.join (expand (a1), expand (a2))
-    return disjuncts.length === 1 ? disjuncts[0]
-      : Store.or (...disjuncts) // FIXME should mark this as an n-ary 
+
+    //log ('or disjuncts', disjuncts)
+
+    const r = disjuncts.length === 1 ? disjuncts[0]
+      : disjuncts.length === 2 ? Store.apply (OR, ...disjuncts)
+      : Store.apply (OR_N, ...disjuncts)
+    
+    log ('stored', r, Store.out(r))
+    return r
   }
 
   conc (a1, a2) {
@@ -245,7 +257,8 @@ return new (class Normalised {
     const concats = SquashSemiGroup (this._squash.bind (this)) .concat ([a1], [a2])
     //log ('conc result', concats, concats.length === 1, concats[1])
     const r = concats.length === 1 ? concats[0]
-      : Store.inn([CONC, ...concats]) // FIXME should mark as nary
+      : concats.length === 2 ? Store.apply (CONC, ...concats)
+      : Store.apply (CONC_N, ...concats)
     //log ('stored', r)
     return r
   }

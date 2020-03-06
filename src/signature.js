@@ -23,14 +23,16 @@ const Operators =  {
   AND: 'and', 
   OR : 'or', 
   CONC : 'conc', 
+  // Hacked in here, used by normalise
+  OR_N: 'or_n',
+  CONC_N: 'conc_n',
 }
 
 const {
   TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
-  GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC, REPEAT } = Operators // TODO; adding repeat everywhere..
-
+  GROUP, REPEAT, NOT,
+  AND, OR, CONC, OR_N, CONC_N } = Operators
 
 const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
@@ -92,8 +94,8 @@ class Algebra {
       }
       catch (e) {
         console.log (`Error in ${object.constructor.name}.apply`)
-        console.log (`Calling ${json(op)} on `, args)
-        console.log (object [Symbol.iterator] ? [...object] : object)
+        console.log (`Calling ${json(op)} on `, args, 'in Algebra')
+        console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
         throw e
       }
     }
@@ -116,6 +118,8 @@ class Algebra {
       and:    (r, s)  => apply (AND,   r, s),
       or:     (...as) => apply (OR,   ...as),
       conc:   (...as) => apply (CONC, ...as),
+      or_n:   (...as) => apply (OR_N,   ...as),
+      conc_n: (...as) => apply (CONC_N, ...as),
     }
   }
 }
