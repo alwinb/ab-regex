@@ -64,6 +64,7 @@ function OneLevel (Terms = new Normalised ()) {
         //derivs.toString ()
       ] .join (' ')
     }
+
   }
 
   //
@@ -115,31 +116,27 @@ function OneLevel (Terms = new Normalised ()) {
 
   repeat ({ term, accepts, derivs }, least, most) {
     //log ('repeat', term, derivs.toString(), least, most)
-    const repeatTerm = Terms.repeat (term, Math.max(least-1, 0), most-1)
     //log ('repeatTerm',  Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs).toString())
+    const newTerm = Terms.repeat (term, least, most) // NB callin gthis first; keep the heap ordered
+    const repeatTerm = Terms.repeat (term, Math.max (least-1, 0), Math.max (most-1, 0))
     return new State (
-      Terms.repeat (term, least, most),
+      newTerm,
       Accepts.repeat (accepts, least, most),
       Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs)
       // ∂r<l,m> = ∂r<max(l-1, 0), m-1>
     )
   }
 
-  or (left, right, ...rest) {
+  ors (...as) {
+    return as.reduce (this.or.bind (this))
+  }
+
+  or (left, right) {
     return new State (
       Terms.or (left.term, right.term),
       Accepts.or (left.accepts, right.accepts), 
       Derivs.byMerging (Terms.or, left.derivs, right.derivs)
     )
-  }
-  
-  or_n (...args) {
-    // OK so this is the issue,
-    // reduce generates new terms, because,
-    // it recomputes terms, and the or_n has an order
-    // that is not in the store already in left-assoc grouping of the args/ids.
-    // But this whole thing, is messy, this recomputing of terms as state-id. 
-    return args.reduce (this.or.bind(this))
   }
 
   and (left, right) {
@@ -150,16 +147,16 @@ function OneLevel (Terms = new Normalised ()) {
     )
   }
 
-  conc (...args) {
-    //log ('conc', args)
-    return args.reduce (this._conc2)
+  concs (...as) {
+    return as.reduce (this.conc.bind(this))
   }
 
-  // TODO check this
-  _conc2 (head, tail) {
+  conc (head, tail) {
+    log ('calling conc', head, tail)
+    const newTerm = Terms.conc (head.term, tail.term)
     const left = Derivs.byMapping (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
     return new State (
-      Terms.conc (head.term, tail.term),
+      newTerm,
       Accepts.conc (head.accepts, tail.accepts), 
       !head.accepts ? left : Derivs.byMerging (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
     )
@@ -174,78 +171,60 @@ function OneLevel (Terms = new Normalised ()) {
 // When a one-level unfolding is computed, the derivative terms that are generated
 // in the process are stored in the Normalised store. 
 
-function Compiler (Terms = new Normalised) {
-
-  const Deltas = new OneLevel (Terms)
-  const heap = Terms._heap
+function Compiler () {
+  const Derivs = new OneLevel ()
+  const heap = Derivs._heap
   const states = []
+  this.apply = apply.bind (this)
 
-  return new (class Compiler {
-    
-    constructor () {
-      this._catchUp ()
-      this.apply = this.apply.bind (this)
-    }
+  for (let x of heap)
+    states.push (Derivs.apply (...x))
 
-    _catchUp () {
-      for (let x = states.length; x < heap.length; x++) {
-        const derivsOp = Algebra.fmap (y => states[y]) (heap[x])
-        const unfold = Deltas.apply (...derivsOp)
-        if (x !== unfold.term) {
-          log ('got', unfold+'', "for term", x)
-          log ('within Catch up to term', x, 'heap size', heap.length, [...Terms], [...this._inspect()])
-          throw new Error ('something went wrong, id mismatch')
-        }
-        states [x] = unfold
+  this._inspect = function* () {
+    for (let s of states)
+      yield s+''
+  }
+
+  this[Symbol.iterator] = function* () {
+    for (let s of states)
+      yield s
+  }
+
+  function apply (...fx) {
+    try {
+      let i = states.length-1
+      const d = Derivs.apply (...fx)
+      states[d.id] = d
+      //log ('compile started at', i, 'created', d.id)
+      //log (states.map (x => x == null ? null : x.id))
+      for (; i<heap.length; i++) if (!states[i]) {
+          let dop = Algebra.fmap (y => states[y]) (heap[i])
+          //log ('missing state', i, dop)
+          let d = Derivs.apply (...dop)
+          //log ('created', d)
+          states[d.id] = d
       }
+      return d
     }
-
-    apply (...fx) {
-      try {
-        const term = Terms.apply (...fx)
-        //const termOp = Algebra.fmap (y => heap[y]) (fx)
-        log ('Compiler apply', fx)//, [...entries()])
-        const [nodesl, termsl] = [states, heap].map(x => x.length)
-        //log ('begin Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
-        this._catchUp ()
-        //log ('end Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
-        return term
-      }
-      catch (e) {
-        log ('Error in Compiler.apply', json (fx[0]), fx.slice (1))
-        log ('Store', [...Terms])
-        log ('Derivs', [...this._inspect()])
-        throw (e)
-      }
+    catch (e) {
+      console.log (`Error in ${this.constructor.name}.apply`)
+      console.log (`Calling ${json(fx[0])} on `, fx.slice(1), 'in Algebra'. this.constructor.name)
+      console.log (this [Symbol.iterator] ? [...this._inspect()] : this)
+      throw e
     }
+  }
 
-    lookup (x) {
-      return states [x]
+  this.run = function (id, string = '') {
+    log ('run\n', id, states[id], '=>')
+    for (let char of string) {
+      if (id === Derivs.bottom.id) return states[id]
+      if (id === Derivs.top.id) return states[id]
+      id = states[id].derivs.lookup (char)
+      log (char, '===>', id, states[id].accepts)
     }
+    return states [id]
+  }
 
-    run (id, string = '') {
-      log ('run\n', id, states[id].term, '=>')
-      for (let char of string) {
-        if (id === Terms.bottom) return states[id]
-        if (id === Terms.top) return states[id]
-        id = states[id].derivs.lookup (char)
-        log (char, '===>', id, states[id].accepts)
-      }
-      return states [id]
-    }
-
-    *[Symbol.iterator] () {
-      for (let i = 0, l = states.length; i<l; i++)
-        yield states[i]
-    }
-
-    *_inspect () {
-      for (let i = 0, l = states.length; i<l; i++)
-        yield [i, states[i].toString()]
-    }
-
-  })
 }
-
 
 module.exports = { OneLevel, Compiler, Normalised }

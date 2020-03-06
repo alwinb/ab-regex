@@ -21,7 +21,7 @@ const {
   TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
   GROUP, REPEAT, NOT,
-  AND, OR, CONC, OR_N, CONC_N } = Operators
+  AND, OR, CONC, ORS, CONCS } = Operators
 
 //log (["_n00", "_aap", "_baa", "_6aaas"].sort(_compareArgs(cmpJs)))
 
@@ -47,8 +47,8 @@ function _printFx (out, [op, ...args]) {
     : op === AND   ?  `(${ args .map (p) .join (' & ') })`
     : op === OR    ?  `(${ args .map (p) .join (' | ') })`
     : op === CONC  ?  `(${ args .map (p) .join ('')    })`
-    : op === OR_N  ?  `(${ args .map (p) .join (' | ') })`
-    : op === CONC_N ? `(${ args .map (p) .join ('')    })`
+    : op === ORS  ?  `(${ args .map (p) .join (' | ') })`
+    : op === CONCS ? `(${ args .map (p) .join ('')    })`
     : '' ) }
 
 function printRepeat (l, m) {
@@ -124,9 +124,9 @@ function SemiLattice (compareElement) {
 
 function SquashSemiGroup (squash) {
   
-  return { concat: (as, bs) => [...concat (as, bs)] }
+  return { join: (as, bs) => [...join (as, bs)] }
   
-  function *concat (as, bs) {
+  function *join (as, bs) {
     let i = 0, l = as.length-1
     while (i < l) yield as [i++]
     yield* squash (as[i], bs[0])
@@ -231,7 +231,7 @@ return new (class Normalised {
     //log ('or', a1, a2)
     const expand = a => {
       let [op, ...as] = Store.out (a)
-      return op === OR ? as : [a] }
+      return op === OR || op === ORS ? as : [a] }
 
     //log ('expand', expand (a1), expand (a2))
 
@@ -241,9 +241,9 @@ return new (class Normalised {
 
     const r = disjuncts.length === 1 ? disjuncts[0]
       : disjuncts.length === 2 ? Store.apply (OR, ...disjuncts)
-      : Store.apply (OR_N, ...disjuncts)
+      : Store.apply (ORS, ...disjuncts)
     
-    log ('stored', r, Store.out(r))
+    //log ('stored', r, Store.out(r))
     return r
   }
 
@@ -254,11 +254,16 @@ return new (class Normalised {
     if (a2 === bottom) return bottom
     if (a1 === empty) return a2
     if (a2 === empty) return a1
-    const concats = SquashSemiGroup (this._squash.bind (this)) .concat ([a1], [a2])
+    
+    const expand = a => {
+      let [op, ...as] = Store.out (a)
+      return op === CONC || op === CONCS ? as : [a] }
+
+    const joined = SquashSemiGroup (this._squash.bind (this)) .join (expand (a1), expand (a2))
     //log ('conc result', concats, concats.length === 1, concats[1])
-    const r = concats.length === 1 ? concats[0]
-      : concats.length === 2 ? Store.apply (CONC, ...concats)
-      : Store.apply (CONC_N, ...concats)
+    const r = joined.length === 1 ? joined[0]
+      : joined.length === 2 ? Store.apply (CONC, ...joined)
+      : Store.apply (CONCS, ...joined)
     //log ('stored', r)
     return r
   }

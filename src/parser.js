@@ -106,13 +106,13 @@ function evalToken (token, algApply) {
 }
 
 
-function parse (input, { apply = (...fx) => fx } = { }) {
-  
+function parse (input, alg = { apply: (...fx) => fx }) {
+
   apply_ = (...fx) => {
     //log ('apply_ wrapper', fx)
     if (Array.isArray(fx[0]) && fx[0][0] === 'repeat')
     fx = ['repeat', fx[1], fx[0][1], fx[0][2]]
-    return apply (...fx)
+    return alg.apply (...fx)
   }
   
   let evaluator

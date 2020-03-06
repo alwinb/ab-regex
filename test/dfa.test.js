@@ -3,35 +3,11 @@ const { tokenize, parse } = require ('../src/parser')
 const { Shared, Normalised } = require ('../src/terms')
 const { Compiler, OneLevel, _print } = require ('../src/dfa')
 const Regex = require ('../src/')
+const samples = require ('./samples')
 
 //
 //  Test Compiler
 //
-
-const compileSamples = [
-
-  // Constants and literals
-
-  // '⊤',
-  // '⊥',
-  // 'ε',
-  // '.',
-  // 'a',
-
-  // Disjunction
-
-  'a|a|a',
-  'a|(b|c)',
-  '(a|b)|(c|d)',
-
-  // Testing CONC normalisation
-
-  'aa',
-  'a+a',
-  'aa*',
-  'aa+aa',
-  'a+a+',
-]
 
 function testCompiler (sample) {
   log ('\n', sample, '\n===================\n')
@@ -40,7 +16,7 @@ function testCompiler (sample) {
   const store = new Compiler ()
   const ref = parse (sample, store)
   //log (store._inspect (ref))
-  log (ref, [...store._inspect ()])
+  log (ref, [...store._inspect()])
 }
 
 // var derivs = new OneLevel ()
@@ -50,7 +26,7 @@ function testCompiler (sample) {
 // log(derivs._inspect (r))
 
 //parseSamples.forEach (testParse)
-compileSamples.forEach (testCompiler)
+samples.forEach (testCompiler)
 
 
 //
@@ -65,7 +41,7 @@ function testRun (sample, input) {
   const ref = parse (sample, store)
   //log ('Runsss', ...store.nodes, ref )
   log (ref, [...store._inspect()])
-  log (store.run (ref, input))
+  log (store.run (ref.id, input))
 }
 
 
@@ -160,7 +136,7 @@ log (r.test ('aac'))
 log (r.test ('acc'))
 //*/
 
-//*
+/*
 //var r = new Regex ('[0-9]+[.-.]?[0-9]+')
 //var r = new Regex ('a*bb+?*c*c+')
 var samples = [

@@ -7,11 +7,10 @@ class Regex {
   constructor (arg = { }) {
     if (typeof arg === 'string') return new Regex ({ fromString:arg })
     const { store = new Compiler (), fromString = '' } = arg
-    const p = parse (String (fromString), store)
-    const info = store.lookup (p)
+    const firstLevel = parse (String (fromString), store)
     this.store = store
-    this.state = info.id
-    this.accepts = info.accepts
+    this.state = firstLevel.id
+    this.accepts = firstLevel.accepts
     // for imcremental runs; should be in a 'Run' object
     this.position = 0
     Object.defineProperty (this, 'store', { enumerable: false })

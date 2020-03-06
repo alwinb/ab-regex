@@ -15,6 +15,14 @@ var samples = [
   'a|a|a',
   'a|(b|c)',
   '(a|b)|(c|d)',
+  'a|b|c|a',
+  'a|b|c|a|z|r|b|b|ua|b',
+
+
+  // Conjuncts
+  '(aaa)(aaa)',
+  '(abc)(cba)',
+  '(a|b|c)*...',
 
   // Quantifiers
 
@@ -32,7 +40,6 @@ var samples = [
 
   'ab',
   'a*b',
-
   'a*a',
   'a*a*',
   'a+a',
@@ -42,7 +49,6 @@ var samples = [
   'aa*',
   'aa+',
   'aa+aa',
-
 
   //   'a'
   // , '!a b'
