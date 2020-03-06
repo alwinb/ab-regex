@@ -48,30 +48,40 @@ function testParse (sample) {
 //
 
 var normalizeSamples = [
-  'a<0-1>',
-  'a<0-0>',
-  'a<0-*>',
-  'a<1-*>',
-  'a<2-3>',
-  'a<2-3><1-2>',
 
-  'a',
-  '⊤',
-  '⊥',
-  '.',
-  'a+',
-  'ab',
-  'a|a|a', 
-  'a|(b|c)', 
-  '(a|b)|(c|d)', 
-  'a*', 
-  'a*a*',
-  'a*a',
-  'aa*',
-  'a+a*',
+
+  // Testing CONC normalisation
+  'aa',
   'a+a',
-  'aa+',
-  'a*b',
+  'aa*',
+  'a+a+',
+  'aa+aa',
+  
+  // Testing REPEAT normalisation
+  // 'a<0-1>',
+  // 'a<0-0>',
+  // 'a<0-*>',
+  // 'a<1-*>',
+  // 'a<2-3>',
+  // 'a<2-3><1-2>',
+
+  // 'a',
+  // '⊤',
+  // '⊥',
+  // '.',
+  // 'a+',
+  // 'ab',
+  // 'a|a|a',
+  // 'a|(b|c)',
+  // '(a|b)|(c|d)',
+  // 'a*',
+  // 'a*a*',
+  // 'a*a',
+  // 'aa*',
+  // 'a+a*',
+  // 'a+a',
+  // 'aa+',
+  // 'a*b',
 ]
 
 function testNormalize (sample) {
@@ -83,6 +93,6 @@ function testNormalize (sample) {
   log (ref, [...store])
 }
 
-parseSamples.forEach (testParse)
+//parseSamples.forEach (testParse)
 normalizeSamples.forEach (testNormalize)
 

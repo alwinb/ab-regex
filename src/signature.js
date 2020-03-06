@@ -1,4 +1,5 @@
 const log = console.log.bind (console)
+const json = x => JSON.stringify (x, null, 2)
 
 //  Signature
 
@@ -81,12 +82,21 @@ class Algebra {
   }
 
   static fromObject (object) { 
-    return (op, ...args) => false ? false
-      : op === BOT   ? object.bottom
-      : op === TOP   ? object.top
-      : op === EMPTY ? object.empty
-      : op === ANY   ? object.any
-      : object [op] (...args)
+    return (op, ...args) => { try {
+      return false ? false
+        : op === BOT   ? object.bottom
+        : op === TOP   ? object.top
+        : op === EMPTY ? object.empty
+        : op === ANY   ? object.any
+        : object [op] (...args)
+      }
+      catch (e) {
+        console.log (`Error in ${object.constructor.name}.apply`)
+        console.log (`Calling ${json(op)} on `, args)
+        console.log (object [Symbol.iterator] ? [...object] : object)
+        throw e
+      }
+    }
   }
 
   static fromFunction (apply) {

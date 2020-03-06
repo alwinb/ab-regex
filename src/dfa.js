@@ -1,4 +1,5 @@
 const log = console.log.bind (console)
+const json = x => JSON.stringify (x, null, 2)
 const { Algebra } = require ('./signature')
 const { Normalised, _print } = require ('./terms')
 const { RangeList, RangeSet } = require ('./rangelist')
@@ -186,14 +187,21 @@ function Compiler (Terms = new Normalised) {
     }
 
     apply (...fx) {
-      const term = Terms.apply (...fx)
-      //const termOp = Algebra.fmap (y => heap[y]) (fx)
-      //log ('Compiler apply', fx)//, [...entries()])
-      const [nodesl, termsl] = [states, heap].map(x => x.length)
-      //log ('begin Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
-      this._catchUp ()
-      //log ('end Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
-      return term
+      try {
+        const term = Terms.apply (...fx)
+        //const termOp = Algebra.fmap (y => heap[y]) (fx)
+        //log ('Compiler apply', fx)//, [...entries()])
+        const [nodesl, termsl] = [states, heap].map(x => x.length)
+        //log ('begin Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
+        this._catchUp ()
+        //log ('end Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
+        return term
+      }
+      catch (e) {
+        log ('Error in Compiler.apply', json (fx[0]), fx.slice (1))
+        log ([...this._inspect()])
+        throw (e)
+      }
     }
 
     lookup (x) {

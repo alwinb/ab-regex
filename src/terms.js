@@ -91,30 +91,57 @@ function Shared () {
 // Normalised term store
 // =====================
 
-// 'zip' is used in the normalisation of nested disjunctions
-// ... it zips together two ordered lists, maintaining order and removing duplicates
+// SemiLattice implementation for flattening nested ORs
+// Implemented for nonempty ordered arrays. 
 
-function zipList (compareElement) { return function* (as, bs) {
-  //log (as, bs)
-  as = as [Symbol.iterator] ()
-  bs = bs [Symbol.iterator] ()
-  let [a, b] = [as.next(), bs.next()]
-  while (!(a.done && b.done)) {
-    if (a.done) { yield b.value; yield* bs; return }
-    if (b.done) { yield a.value; yield* as; return }
-    const c = compareElement (a.value, b.value)
-    if (c < 0) { yield a.value; a = as.next ()}
-    else if (c > 0) { yield b.value; b = bs.next ()}
-    else { yield a.value; [a, b] = [as.next (), bs.next ()] }
+function SemiLattice (compareElement) {
+
+  return { join: (as, bs) => [...zip (as, bs)] }
+
+  function* zip (as, bs) {
+    //log (as, bs)
+    as = as [Symbol.iterator] ()
+    bs = bs [Symbol.iterator] ()
+    let [a, b] = [as.next(), bs.next()]
+    while (!(a.done && b.done)) {
+      if (a.done) { yield b.value; yield* bs; return }
+      if (b.done) { yield a.value; yield* as; return }
+      const c = compareElement (a.value, b.value)
+      if (c < 0) { yield a.value; a = as.next () }
+      else if (c > 0) { yield b.value; b = bs.next ()}
+      else { yield a.value; [a, b] = [as.next (), bs.next ()] }
+    }
   }
-}}
+}
 
-// log ([... _subLists (cmpJs)("abjhs", "abcdegjs")].join(""))
+// log (SemiLattice (cmpJs) .join ("acejhs", "abcdegjs") .join (''))
+
+// 'Squash' Semigroup for flattening nested CONCs;
+// Implemented as concatenation of nonempty lists, possibly squashing
+// the last element of the first, with first element of the last. 
+
+function SquashSemiGroup (squash) {
+  
+  return { concat: (as, bs) => [...concat (as, bs)] }
+  
+  function *concat (as, bs) {
+    let i = 0, l = as.length-1
+    while (i < l) yield as [i++]
+    yield* squash (as[i], bs[0])
+    i = 1, l = bs.length
+    while (i < l) yield bs [i++]
+  }
+
+}
+
+
 // log ([... zip (cmpJs)([5], [6])])
 
 function Normalised (Store = new Shared ()) {
+
 const { top, bottom, empty, any } = Store
-const zip = zipList (cmpJs)
+const ordTimes = (a,b) => a && b && a * b // 'Ordinal multiplication'
+const OrSemiLattice = SemiLattice (cmpJs)
 
 return new (class Normalised {
 
@@ -152,16 +179,20 @@ return new (class Normalised {
     return c === NOT ? a11 : Store.not (a1) // !!r == r
   }
 
-  // star, opt, plus, are going to be unified
-  // a? = a<0,1> a* = a<0,inf>  a+ = a<1,inf>
+  // Unified quantifiers; denoting omega with * here:
+  // a? = a<0,1> a* = a<0,*>  a+ = a<1,*>
 
   repeat (a1, least, most) {
     // _<0,0> => epsilon
     // a<1,1> => a
-    // .<0,inf> => top
-    // _<inf,inf> => bottom
+    // .<0,*> => top
+    // _<*,*> => bottom
+    // empty<l,m> = empty = _<0,0>
+    // top<l,m> => if l === 0 empty else top
+    // bot<l,m> => if l === 0 empty else bot
+    // any<0,*> => top
+    // a<l,m><k,n> = a<l*k,m*n>
     const [c,x,l,m] = Store.out (a1)
-    const ordTimes = (a,b) => a && b && a * b
     return most === 0 ? empty
       : least === Infinity ? bottom 
       : least === 1 && most === 1 ? a1
@@ -169,13 +200,8 @@ return new (class Normalised {
       : a1 === empty ? empty
       : a1 === top ? top
       : a1 === bottom ? bottom
-      : c === REPEAT ? Store.repeat (x, ordTimes (least * l), ordTimes (most * m))
+      : c === REPEAT ? Store.repeat (x, ordTimes (least, l), ordTimes (most, m))
       : Store.repeat (a1, least, most)
-    // empty<l,m> = empty = _<0,0>
-    // top<l,m> => if l === 0 empty else top
-    // bot<l,m> => if l === 0 empty else bot
-    // any<l,m> => if l === 0, m === inf then top
-    //a<l,m><l2,m2> = a<l1*l2,m*m2>
   }
 
   and (a1, a2) {
@@ -188,11 +214,7 @@ return new (class Normalised {
     return Store.and (a1, a2)
   }
   
-  or (...args) { // n-ary OR
-    return args.reduce (this._or2.bind (this))
-  }
-
-  _or2 (a1, a2) {
+  or (a1, a2) {
     const repeat = this.repeat.bind (this)
     if (a1 === top) return top          // ⊤ | r = ⊤
     if (a2 === top) return top          // r | ⊤ = ⊤
@@ -201,51 +223,49 @@ return new (class Normalised {
     if (a1 === empty) return repeat (a2, 0, 1) // ε | r = r?
     if (a2 === empty) return repeat (a1, 0, 1) // r | ε = r?
 
-    // (r | s) | t  =  r | (s | t) = OR { r, s, t }
+    // (r | s) | t  =  r | (s | t) = OR{ r, s, t }
     // (r | s) | (t | u) = OR { r, s, t, u }
 
     const expand = a => {
       let [op, ...as] = Store.out (a)
       return op === OR ? as : [a] }
 
-    const disjuncts = [...zip (expand (a1), expand (a2))]
+    const disjuncts = OrSemiLattice.join (expand (a1), expand (a2))
     return disjuncts.length === 1 ? disjuncts[0]
-      : Store.or (...disjuncts)
+      : Store.or (...disjuncts) // FIXME should mark this as an n-ary 
   }
 
-  conc (...args) {
-    //log ('normalize conc', args)
-    // ε r = r ε = r
+  conc (a1, a2) {
     // ⊥ r = r ⊥ = ⊥
-    const concs = []
-    for (let a of args) {
-      if (a === bottom) return bottom
-      if (a === empty) continue
-      const [c, ...as] = Store.out (a)
-      if (c === CONC) concs.push (...as)
-      else concs.push (a)
-    }
-    return !concs.length ? empty
-      : concs.length === 1 ? concs[0]
-      : Store.conc (...concs)
-    //////////////
-
+    // ε r = r ε = r
     if (a1 === bottom) return bottom
     if (a2 === bottom) return bottom
     if (a1 === empty) return a2
     if (a2 === empty) return a1
-
-    // TODO: these rules
-    // r* r* = r*
-    // r* r+ = r+
-    // r+ r* = r+
-    // r+ r+ = rr+
-    // r* r  = r+
-    // r  r* = r+
-    // r+ r  = rr+
-    // (r s) t = r (s t)
+    const concats = SquashSemiGroup (this._squash.bind (this)) .concat ([a1], [a2])
+    //log ('conc result', concats, concats.length === 1, concats[1])
+    const r = concats.length === 1 ? concats[0]
+      : Store.inn([CONC, ...concats]) // FIXME should mark as nary
+    //log ('stored', r)
+    return r
   }
 
+  _squash (a, b) { // Concatenation of two elements
+      // log ('squash', a, b)
+      let [aop, a1, aleast, amost] = Store.out (a)
+      let [bop, b1, bleast, bmost] = Store.out (b)
+      const r = aop === REPEAT && bop === REPEAT && a1 === b1
+          ? [ Store.repeat (a1, aleast + bleast, amost + bmost) ]
+        : a === b1 && bop === REPEAT
+          ? [ Store.repeat (a, bleast+1, bmost+1) ]
+        : aop === REPEAT && b === a1
+          ? [ Store.repeat (b, aleast+1, amost+1) ]
+        : a === b
+          ? [ Store.repeat (a, 2, 2) ]
+        : [ a, b ]
+      // log ('squash result', r)
+      return r
+  }
 
 })}
 
