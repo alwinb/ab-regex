@@ -1,6 +1,6 @@
 const log = console.log.bind (console)
 const { tokenize, parse } = require ('../src/parser')
-const { Shared, _print } = require ('../src/terms')
+const { Shared, _print } = require ('../src/normalize')
 const samples = require ('./samples')
 
 function testParse (sample) {

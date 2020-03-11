@@ -1,6 +1,6 @@
 const log = console.log.bind (console)
 const { tokenize, parse } = require ('../src/parser')
-const { Shared, Normalised } = require ('../src/terms')
+const { Shared, Normalised } = require ('../src/normalize')
 const { Compiler, OneLevel, _print } = require ('../src/dfa')
 const Regex = require ('../src/')
 const samples = require ('./samples')

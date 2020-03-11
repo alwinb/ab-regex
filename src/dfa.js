@@ -1,7 +1,7 @@
 const log = console.log.bind (console)
 const json = x => JSON.stringify (x, null, 2)
 const { Algebra } = require ('./signature')
-const { Normalised, _print } = require ('./terms')
+const { Normalised, _print } = require ('./normalize')
 const { RangeList, RangeSet } = require ('./rangelist')
 
 // One Level Unfoldings

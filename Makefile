@@ -3,7 +3,7 @@
 all: ab-regex
 ab-regex: dist/ab-regex.min.js
 
-srcs = aatree.js dfa.js parser.js signature.js browser.js index.js rangelist.js terms.js
+srcs = aatree.js dfa.js parser.js signature.js browser.js index.js rangelist.js normalize.js
 src = $(addprefix src/, $(srcs)) 
 
 dist/ab-regex.min.js: dist/ $(src)
