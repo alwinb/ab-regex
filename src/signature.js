@@ -1,5 +1,5 @@
 const log = console.log.bind (console)
-const Strings = new Proxy ({}, { get:(_,k) => k })
+const json = x => JSON.stringify (x, null, 2)
 
 //  Signature
 
@@ -7,17 +7,32 @@ const Strings = new Proxy ({}, { get:(_,k) => k })
 // The Node 'class' is just a namespace at the moment
 // Nodes themselves are simply arrays [operator, ...args]
 
-const {
-  TOP, BOT, EMPTY,
-  STEP, ANY, RANGE,
-  GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC } = Strings
+const Operators =  {
+  TOP : 'top', 
+  BOT : 'bottom', 
+  EMPTY : 'empty', 
+  STEP: 'step', 
+  ANY : 'any', 
+  RANGE : 'range', 
+  GROUP: 'group', 
+  REPEAT : 'repeat', 
+  STAR : 'star', 
+  OPT : 'opt', 
+  PLUS : 'plus', 
+  NOT : 'not', 
+  AND: 'and', 
+  OR : 'or', 
+  CONC : 'conc', 
+  // Hacked in here, used by normalise
+  ORS: 'ors',
+  CONCS: 'concs',
+}
 
-const Operators = {
-  TOP, BOT, EMPTY,
+const {
+  TOP, BOT, EMPTY, 
   STEP, ANY, RANGE,
-  GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC }
+  GROUP, REPEAT, NOT,
+  AND, OR, CONC, ORS, CONCS } = Operators
 
 const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
@@ -28,6 +43,8 @@ const _compareArgs = cmpX => (a, b) => {
     r = r || cmpX (a[i], b[i])
   return r
 }
+
+//log (["_n00", "_aap", "_baa", "_6aaas"].sort(_compareArgs(cmpJs)))
 
 // I like the idea of
 //  just converting between apply and the object
@@ -40,11 +57,12 @@ class Algebra {
   static fmap (fn) { return tm => {
     const [c, ...args] = tm
     return c === STEP  ? tm
-      : c === ANY   ? tm
-      : c === RANGE ? tm
+      : c === ANY    ? tm
+      : c === RANGE  ? tm
       : c === EMPTY  ? tm
-      : c === TOP   ? tm
-      : c === BOT   ? tm
+      : c === TOP    ? tm
+      : c === BOT    ? tm
+      : c === REPEAT ? [c, fn (args[0]), args[1], args[2]]
       : [c, ...args.map (fn)] }
   }
 
@@ -56,6 +74,7 @@ class Algebra {
     const r = Algebra.compareOperator (c, d)
       || (c === STEP  && 0 || cmpJs (a[1], b[1]))
       || (c === RANGE && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
+      || (c === REPEAT && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
       || _compareArgs (compareElement) (a, b)
     return r }
   }
@@ -66,44 +85,43 @@ class Algebra {
     return cmpJs (op1, op2)
   }
 
-  static fromObject (object) { return ([op, ...args]) => (
-    // constants
-    op === BOT   ? object.bottom :
-    op === TOP   ? object.top :
-    op === EMPTY ? object.empty :
-    op === ANY   ? object.any :
-    // vars
-    op === STEP  ? object.step  (...args) :
-    op === RANGE ? object.range (...args) :
-    // unary
-    op === GROUP ? object.group (...args) :
-    op === STAR  ? object.star  (...args) :
-    op === PLUS  ? object.plus  (...args) :
-    op === OPT   ? object.opt   (...args) :
-    op === NOT   ? object.not   (...args) :
-    // binary; nary...
-    op === OR    ? object.or    (...args) :
-    op === AND   ? object.and   (...args) :
-    op === CONC  ? object.conc  (...args) :
-    undefined
-  )}
-  
+  static fromObject (object) { 
+    return (op, ...args) => { try {
+      return false ? false
+        : op === BOT   ? object.bottom
+        : op === TOP   ? object.top
+        : op === EMPTY ? object.empty
+        : op === ANY   ? object.any
+        : object [op] (...args)
+      }
+      catch (e) {
+        console.log (`Error in ${object.constructor.name}.apply`)
+        console.log (`Calling ${json(op)} on `, args, 'in Algebra')
+        console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
+        throw e
+      }
+    }
+  }
+
   static fromFunction (apply) {
     return {
-      bottom: apply ([BOT]),
-      top:    apply ([TOP]),
-      empty:  apply ([EMPTY]),
-      any:    apply ([ANY]),
-      step:   (...args) => apply ([STEP,  ...args]),
-      range:  (...args) => apply ([RANGE, ...args]),
-      group:  (...args) => apply ([GROUP, ...args]),
-      star:   (...args) => apply ([STAR,  ...args]),
-      plus:   (...args) => apply ([PLUS,  ...args]),
-      opt:    (...args) => apply ([OPT,   ...args]),
-      not:    (...args) => apply ([NOT,   ...args]),
-      or:     (...args) => apply ([OR,    ...args]),
-      and:    (...args) => apply ([AND,   ...args]),
-      conc:   (...args) => apply ([CONC,  ...args]),
+      bottom: apply (BOT),
+      top:    apply (TOP),
+      empty:  apply (EMPTY),
+      any:    apply (ANY),
+      step:   (a)     => apply (STEP,  a ),
+      range:  (a, b)  => apply (RANGE, a, b),
+      group:  (r)     => apply (GROUP, r   ),
+      repeat: (r,l,m) => apply (REPEAT, r, l, m),
+      star:   (r)     => apply (STAR,  r   ),
+      plus:   (r)     => apply (PLUS,  r   ),
+      opt:    (r)     => apply (OPT,   r   ),
+      not:    (r)     => apply (NOT,   r   ),
+      and:    (r, s)  => apply (AND,   r, s),
+      or:     (...as) => apply (OR,   ...as),
+      conc:   (...as) => apply (CONC, ...as),
+      ors:    (...as) => apply (ORS,   ...as),
+      concs:  (...as) => apply (CONCS, ...as),
     }
   }
 }

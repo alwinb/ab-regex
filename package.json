@@ -3,12 +3,7 @@
   "version": "0.1.0-alpha",
   "description": "regular expression engine",
   "main": "src/index.js",
-  "directories": {
-    "lib": "lib"
-  },
-  "dependencies": {
-    "ab-parse": "git+https://github.com/alwinb/ab-parse.git"
-  },
+  "dependencies": {},
   "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

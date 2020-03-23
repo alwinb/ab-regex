@@ -1,2 +1,4 @@
 ignore/
-node_modules
+notes/
+dist/
+node_modules/

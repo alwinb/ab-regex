@@ -1,15 +1,9 @@
 const log = console.log.bind (console)
-const { Operators, Algebra } = require ('./signature')
-const { cmpJs, Normalised, _print } = require ('./terms')
-const { RangeList:RL, RangeSet:RS, Upto, Rest } = require ('./rangelist')
+const json = x => JSON.stringify (x, null, 2)
+const { Algebra } = require ('./signature')
+const { Normalised, _print } = require ('./normalize')
+const { RangeList, RangeSet } = require ('./rangelist')
 
-//
-const {
-  TOP, BOT, EMPTY,
-  STEP, ANY, RANGE,
-  GROUP, STAR, OPT, PLUS, NOT,
-  AND, OR, CONC } = Operators
-  
 // One Level Unfoldings
 // These can be computed algebraically
 // depending on two algebras: 
@@ -23,9 +17,7 @@ const Accepts = {
   step:   (...args) => false,
   range:  (...args) => false,
   group:  (...args) => args[0],
-  star:   (...args) => true,
-  plus:   (...args) => args[0],
-  opt:    (...args) => true,
+  repeat: (a0, l,m) => l === 0 ? true : a0,
   not:    (...args) => !args[0],
   or:     (...args) => args.includes (true),
   and:    (...args) => !args.includes (false),
@@ -39,7 +31,15 @@ const first = ({term}) => term
 const second = ({accepts}) => accepts
 const third = ({derivs}) => derivs
 
-function Derivs (Terms = new Normalised) {
+const cmpJs = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
+const compareChar = cmpJs
+const CharSet = RangeSet (compareChar)
+
+
+function OneLevel (Terms = new Normalised ()) {
+
+  const Derivs = RangeList (compareChar, Terms.compare)
+  const print = x => _print (Terms.out, x)
 
   class State {
     constructor (term, accepts, derivs) {
@@ -49,26 +49,43 @@ function Derivs (Terms = new Normalised) {
       this.derivs = derivs   // a RangeList of successor states
     }
 
+    *[Symbol.iterator] () {
+      const { id, term, accepts, derivs } = this
+      yield* [id, print (term), accepts, ... RangeList (compareChar, cmpJs). byMapping (print, derivs) .toArray () ]
+    }
+
     toString () {
-      const {term, accepts, derivs} = this
+      const { term, accepts, derivs } = this
       return [
         term,
-        _print (Terms.out, term),
+        print (term),
         accepts,
-        '[ '+RL.map (x => _print (Terms.out, x), derivs) .toArray ().join(' ')+' ]'
-      ].join(' ')
+        `[ ${ RangeList (compareChar, cmpJs).byMapping (print, derivs) } ]`
+        //derivs.toString ()
+      ] .join (' ')
     }
+
   }
 
+  //
+  //  And not that this works
+  //  want to normalise the delimiters
+  //
 
-return new (class Derivs {
+  return new (class OneLevel {
 
   constructor () {
-    this.bottom = new State (Terms.bottom, Accepts.bottom, new Rest (Terms.bottom))
-    this.top    = new State (Terms.top,    Accepts.top,    new Rest (Terms.top))
-    this.empty  = new State (Terms.empty,  Accepts.empty,  new Rest (Terms.bottom))
-    this.any    = new State (Terms.any,    Accepts.any,    new Rest (Terms.empty))
+    this.bottom = new State (Terms.bottom, Accepts.bottom, Derivs.fromConstant (Terms.bottom))
+    this.top    = new State (Terms.top,    Accepts.top,    Derivs.fromConstant (Terms.top))
+    this.empty  = new State (Terms.empty,  Accepts.empty,  Derivs.fromConstant (Terms.bottom))
+    this.any    = new State (Terms.any,    Accepts.any,    Derivs.fromConstant (Terms.empty))
     this.apply  = Algebra.fromObject (this)
+    
+    this._heap = Terms._heap
+  }
+
+  *[Symbol.iterator] () {
+    yield* Terms._heap
   }
 
   group (x) { return x }
@@ -77,7 +94,7 @@ return new (class Derivs {
     return new State (
       Terms.step (char),
       Accepts.step (char),
-      RL.map (b => b ? Terms.empty : Terms.bottom, RS.eq (char), Terms.compare)
+      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (char))
     )
   }
 
@@ -85,7 +102,7 @@ return new (class Derivs {
     return new State (
       Terms.range (char1, char2),
       Accepts.range (char1, char2),
-      RL.merge ((x,y) => x && y ? Terms.empty : Terms.bottom, RS.gte (char1), RS.lte (char2), Terms.compare)
+      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (char1, char2))
     )
   }
 
@@ -93,44 +110,32 @@ return new (class Derivs {
     return new State (
       Terms.not (term),
       Accepts.not (accepts),
-      RL.map (Terms.not, derivs, Terms.compare)
+      Derivs.byMapping (Terms.not, derivs)
     )
   }
 
-  opt ({ term, accepts, derivs }) {
-    // ∂(r?) = ∂(ε|r) = (∂ε|∂r) = (⊥|∂r) = ∂r
+  repeat ({ term, accepts, derivs }, least, most) {
+    //log ('repeat', term, derivs.toString(), least, most)
+    //log ('repeatTerm',  Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs).toString())
+    const newTerm = Terms.repeat (term, least, most) // NB callin gthis first; keep the heap ordered
+    const repeatTerm = Terms.repeat (term, Math.max (least-1, 0), Math.max (most-1, 0))
     return new State (
-      Terms.opt (term), 
-      Accepts.opt (accepts), 
-      derivs
+      newTerm,
+      Accepts.repeat (accepts, least, most),
+      Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs)
+      // ∂r<l,m> = ∂r<max(l-1, 0), m-1>
     )
   }
 
-  star ({ term, accepts, derivs }) {
-    const starTerm = Terms.star (term)
-    return new State (
-      starTerm,
-      Accepts.star (accepts),
-      RL.map (dr => Terms.conc (dr, starTerm), derivs, Terms.compare)
-    )
+  ors (...as) {
+    return as.reduce (this.or.bind (this))
   }
 
-  plus ({ term, accepts, derivs }) {
-    // ∂(r+) = ∂(rr*) = if accepts(r) then (∂r)r* else (∂r)r* | ∂r*
-    //  else branch: ((∂r)r* | ∂r*) = ((∂r)r* | (∂r)r*) which is (∂r)r* // TODO check that (nullable?)
+  or (left, right) {
     return new State (
-      Terms.plus (term),
-      Accepts.plus (accepts),
-      RL.map (dr => Terms.conc (dr, Terms.star (term)), derivs, Terms.compare)
-    )
-  }
-
-  or (...args) {
-    const derivsOr = (ds1, ds2) => RL.merge (Terms.or,  ds1, ds2, Terms.compare)
-    return new State (
-      Terms.or (...args.map (first)),
-      Accepts.or (...args.map (second)),
-      args.map(third).reduce (derivsOr)
+      Terms.or (left.term, right.term),
+      Accepts.or (left.accepts, right.accepts), 
+      Derivs.byMerging (Terms.or, left.derivs, right.derivs)
     )
   }
 
@@ -138,21 +143,22 @@ return new (class Derivs {
     return new State (
       Terms.and (left.term, right.term),
       Accepts.and (left.accepts, right.accepts), 
-      RL.merge (Terms.and,  left.derivs, right.derivs, Terms.compare)
+      Derivs.byMerging (Terms.and, left.derivs, right.derivs)
     )
   }
 
-  conc (...args) {
-    return args.reduce (this._conc2)
+  concs (...as) {
+    return as.reduce (this.conc.bind(this))
   }
 
-  // TODO check this
-  _conc2 (head, tail) {
-    const left = RL.map (dr => Terms.conc (dr, tail.term), head.derivs, Terms.compare) // left = (∂r)s
+  conc (head, tail) {
+    //log ('calling conc', head, tail)
+    const newTerm = Terms.conc (head.term, tail.term)
+    const left = Derivs.byMapping (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
     return new State (
-      Terms.conc (head.term, tail.term),
+      newTerm,
       Accepts.conc (head.accepts, tail.accepts), 
-      !head.accepts ? left : RL.merge (Terms.or, left, tail.derivs, Terms.compare) // ∂(rs) = (∂r)s + nu(r)∂s
+      !head.accepts ? left : Derivs.byMerging (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
     )
   }
 
@@ -162,71 +168,63 @@ return new (class Derivs {
 // Compiler
 // ========
 // The compiler wraps around the Derivative, and Normalised (Term) algebras
-// When a one-level unfolding is computed, the derivative terms are generated
-// and stored in the normalised term store ...
+// When a one-level unfolding is computed, the derivative terms that are generated
+// in the process are stored in the Normalised store. 
 
 function Compiler () {
+  const Derivs = new OneLevel ()
+  const heap = Derivs._heap
+  const states = []
+  this.apply = apply.bind (this)
 
-  const Terms = new Normalised ()
-  const Deltas = new Derivs (Terms)
-  const heap = Terms._heap
-  const table = []
+  for (let x of heap)
+    states.push (Derivs.apply (...x))
 
-  _catchUp ()
+  this._inspect = function* () {
+    for (let s of states)
+      yield s+''
+  }
 
-  function _catchUp () {
-    for (let x = table.length; x < heap.length; x++) {
-      const derivsOp = Algebra.fmap (y => table[y]) (heap[x])
-      const unfold = Deltas.apply (derivsOp)
-      //log ('within Catch up to term', x, 'heap size', heap.length, [...heap.entries()], [...entries()])
-      if (x !== unfold.term) {
-        log ('got', unfold.toString (), "for term", x)
-        throw new Error ('something went wrong, id mismatch')
+  this[Symbol.iterator] = function* () {
+    for (let s of states)
+      yield s
+  }
+
+  function apply (...fx) {
+    try {
+      let i = states.length-1
+      const d = Derivs.apply (...fx)
+      states[d.id] = d
+      //log ('compile started at', i, 'created', d.id)
+      //log (states.map (x => x == null ? null : x.id))
+      for (; i<heap.length; i++) if (!states[i]) {
+          let dop = Algebra.fmap (y => states[y]) (heap[i])
+          //log ('missing state', i, dop)
+          let d = Derivs.apply (...dop)
+          //log ('created', d)
+          states[d.id] = d
       }
-      table [x] = unfold
+      return d
+    }
+    catch (e) {
+      console.log (`Error in ${this.constructor.name}.apply`)
+      console.log (`Calling ${json(fx[0])} on `, fx.slice(1), 'in Algebra'. this.constructor.name)
+      console.log (this [Symbol.iterator] ? [...this._inspect()] : this)
+      throw e
     }
   }
 
-
-  function apply (fx) {
-    const term = Terms.apply (fx)
-    //const termOp = Algebra.fmap (y => heap[y]) (fx)
-    //log ('Compiler apply', fx)//, [...entries()])
-    const [nodesl, termsl] = [table, heap].map(x => x.length)
-    //log ('begin Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
-    _catchUp ()
-    //log ('end Catch up to term', term, 'heap size', heap.length, [...heap.entries()], [...entries()])
-    return term
-  }
-
-  function lookup (x) {
-    return table[x]
-  }
-
-  function run (id, string = '') {
-    log ('run\n', id, table[id].term, '=>')
+  this.run = function (id, string = '') {
+    //log ('run\n', id, states[id], '=>')
     for (let char of string) {
-      if (id === Terms.bottom) return table[id]
-      if (id === Terms.top) return table[id]
-      id = RL.lookup (char, table[id].derivs, cmpJs)
-      log (char, '===>', id, table[id].accepts)
+      if (id === Derivs.bottom.id) return states[id]
+      if (id === Derivs.top.id) return states[id]
+      id = states[id].derivs.lookup (char)
+      //log (char, '===>', id, states[id].accepts)
     }
-    return table[id]
+    return states [id]
   }
 
-  function inspect (id) {
-    return table[id].toString()
-  }
-
-  function* entries () {
-    for (let [k,item] of table.entries()) yield [k, item.toString()]
-  }
-
-  this.apply = apply
-  this.run = run
-  this.lookup = lookup
-  this.entries = entries
-  this.inspect = inspect
 }
 
-module.exports = { Derivs, Compiler, Normalised, _print }
+module.exports = { OneLevel, Compiler, Normalised }

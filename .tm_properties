@@ -1,0 +1,24 @@
+
+# TextMate configuration
+
+excludeInFolderSearch = "{ignore,dist,node_modules}"
+
+
+# Setting TM_RUN_TARGET to be picked up by my Run Javascript Command
+# Currently set up to run the files with some related 'test' code. 
+
+[src/parser.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/parser.test.js"
+
+[src/rangelist.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/rangelist.test.js"
+
+[src/normalize.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/normalize.test.js"
+
+[src/dfa.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/dfa.test.js"
+
+[src/index.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/index.test.js"
+
