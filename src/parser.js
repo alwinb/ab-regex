@@ -1,5 +1,6 @@
 const log = console.log.bind (console)
-const { Token, TokenClasses, Modifiers, Lexer, Verifier, Parser, Evaluator } = require ('ab-parse')
+const Lexer = require ('../lib/tiny-lexer')
+const { Token, TokenClasses, Modifiers, Parser, Evaluator } = require ('../lib/parse2')
 const T = TokenClasses, M = Modifiers
 const { Operators } = require ('./signature')
 
