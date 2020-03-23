@@ -152,7 +152,7 @@ function OneLevel (Terms = new Normalised ()) {
   }
 
   conc (head, tail) {
-    log ('calling conc', head, tail)
+    //log ('calling conc', head, tail)
     const newTerm = Terms.conc (head.term, tail.term)
     const left = Derivs.byMapping (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
     return new State (
@@ -215,12 +215,12 @@ function Compiler () {
   }
 
   this.run = function (id, string = '') {
-    log ('run\n', id, states[id], '=>')
+    //log ('run\n', id, states[id], '=>')
     for (let char of string) {
       if (id === Derivs.bottom.id) return states[id]
       if (id === Derivs.top.id) return states[id]
       id = states[id].derivs.lookup (char)
-      log (char, '===>', id, states[id].accepts)
+      //log (char, '===>', id, states[id].accepts)
     }
     return states [id]
   }

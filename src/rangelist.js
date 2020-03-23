@@ -1,4 +1,3 @@
-const log = console.log.bind (console)
 
 // RangeLists
 // ==========
@@ -59,14 +58,14 @@ function RangeList (compareKey, compareValue) {
     }
 
     toString () {
-      return this.toArray () .join (' ')
+      return this._toArray () .join (' ')
     }
 
-    toArray () {
+    _toArray () {
       return Array.from (this.iterate ())
     }
-    
-    log () {
+
+    _log () {
       console.log (String (this))
       return this
     }
@@ -126,7 +125,7 @@ function RangeSet (compareElement) {
     }
   }
 
-  RangeSet.top = RangeSet.full
+  RangeSet.prototype.top = RangeSet.prototype.full
   RangeSet.prototype.test = RangeSet.prototype.lookup
 
   return RangeSet
@@ -189,33 +188,5 @@ function merge (fn, xs1, xs2, cmpV, compareKey) {
   }
 
 }
-
-// Examples
-// --------
-
-/*
-const cmpJs = (t1, t2) =>
-  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-
-const CharSet = new RangeSet (cmpJs)
-var test1 = CharSet
-  . fromRange ('a', 'c')
-
-var test2 = CharSet
-  . fromRange ('g', 'j')
-
-var test3 = CharSet
-  . fromRange ('d', 'e')
-
-log (test1, test2)
-
-CharSet.and (test1, test2) .log ()
-CharSet.or (test1, test2) .log ()
-CharSet.or (test1, test3) .log ()
-//*/
-
-//log(test1.lookup ('d'))
-//log (test.toArray())
-//log (test)
 
 module.exports = { RangeList, RangeSet }

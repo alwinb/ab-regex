@@ -1,8 +1,6 @@
-"use strict"
-const log = console.log.bind (console)
-const Strings = new Proxy ({}, { get:(_,k) => k })
 const Map = require ('./aatree.js')
 const { Algebra, Operators } = require ('./signature.js')
+const log = console.log.bind (console)
 
 //
 //  Basic utilities
@@ -11,7 +9,8 @@ const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 
 
-//  Signature
+// Signature
+// ==========
 
 // A 'Node' is _one level_ of a Regex AST tree
 // The Node 'class' is just a namespace at the moment
@@ -22,8 +21,6 @@ const {
   STEP, ANY, RANGE,
   GROUP, REPEAT, NOT,
   AND, OR, CONC, ORS, CONCS } = Operators
-
-//log (["_n00", "_aap", "_baa", "_6aaas"].sort(_compareArgs(cmpJs)))
 
 // Allright; cleaning this up?
 // So
@@ -135,9 +132,12 @@ function SquashSemiGroup (squash) {
   }
 
 }
-
-
 // log ([... zip (cmpJs)([5], [6])])
+
+// Finally, the Normalised term store. 
+// This implements the regex signature,
+// but internally, uses a diffferent signature, with
+// n-ary OR and CONC nodes. 
 
 function Normalised (Store = new Shared ()) {
 
@@ -248,13 +248,11 @@ return new (class Normalised {
   }
 
   conc (a1, a2) {
-    // ⊥ r = r ⊥ = ⊥
-    // ε r = r ε = r
-    if (a1 === bottom) return bottom
-    if (a2 === bottom) return bottom
-    if (a1 === empty) return a2
-    if (a2 === empty) return a1
-    
+    if (a1 === bottom) return bottom    // ⊥ r = ⊥
+    if (a2 === bottom) return bottom    // r ⊥ = ⊥
+    if (a1 === empty) return a2         // ε r = r
+    if (a2 === empty) return a1         // r ε = r
+
     const expand = a => {
       let [op, ...as] = Store.out (a)
       return op === CONC || op === CONCS ? as : [a] }

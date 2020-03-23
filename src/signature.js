@@ -44,6 +44,8 @@ const _compareArgs = cmpX => (a, b) => {
   return r
 }
 
+//log (["_n00", "_aap", "_baa", "_6aaas"].sort(_compareArgs(cmpJs)))
+
 // I like the idea of
 //  just converting between apply and the object
 //  So this is what this does. 

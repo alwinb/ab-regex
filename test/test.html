@@ -122,7 +122,7 @@
   function show (str) {
     try {
       let r = new Regex (String (str))
-      let rows = [...r.store].map (row => {
+      let rows = [...r._store].map (row => {
         let { id, term, accepts, derivs } = row
         return elem `tr` ([id, accepts, elem `code` (derivs.toString())].map (elem `td`))
         })

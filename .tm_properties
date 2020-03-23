@@ -10,9 +10,15 @@ excludeInFolderSearch = "{ignore,dist,node_modules}"
 [src/parser.js]
 TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/parser.test.js"
 
+[src/rangelist.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/rangelist.test.js"
+
 [src/normalize.js]
 TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/normalize.test.js"
 
 [src/dfa.js]
 TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/dfa.test.js"
+
+[src/index.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/index.test.js"
 
