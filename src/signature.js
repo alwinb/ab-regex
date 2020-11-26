@@ -113,7 +113,7 @@ class Algebra {
       range:  (a, b)  => apply (RANGE, a, b),
       group:  (r)     => apply (GROUP, r   ),
       repeat: (r,l,m) => apply (REPEAT, r, l, m),
-      star:   (r)     => apply (STAR,  r   ),
+      star:   (r)     => apply (REPEAT, r, 0, Infinity),
       plus:   (r)     => apply (PLUS,  r   ),
       opt:    (r)     => apply (OPT,   r   ),
       not:    (r)     => apply (NOT,   r   ),

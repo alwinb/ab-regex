@@ -32,28 +32,28 @@ function _printFx (out, [op, ...args]) {
   const [a, b] = args
   const p = x => _print (out, x)
   return (
-      op === STEP  ? a
-    : op === ANY   ? '.'
-    : op === RANGE ? `[${a}-${b}]`
+      op === STEP   ? a
+    : op === ANY    ? '.'
+    : op === RANGE  ? `[${a}-${b}]`
     : op === EMPTY  ? 'ε'
-    : op === TOP   ? '⊤'
-    : op === BOT   ? '⊥'
-    : op === GROUP ?  `(${p(a)})`
-    : op === NOT   ?  `(!${p(a)})`
+    : op === TOP    ? '⊤'
+    : op === BOT    ? '⊥'
+    : op === GROUP  ? `(${p(a)})`
+    : op === NOT    ? `(!${p(a)})`
     : op === REPEAT ? `(${p(a)}${printRepeat(args[1], args[2])})`
-    : op === AND   ?  `(${ args .map (p) .join (' & ') })`
-    : op === OR    ?  `(${ args .map (p) .join (' | ') })`
-    : op === CONC  ?  `(${ args .map (p) .join ('')    })`
-    : op === ORS  ?  `(${ args .map (p) .join (' | ') })`
-    : op === CONCS ? `(${ args .map (p) .join ('')    })`
+    : op === AND    ? `(${ args .map (p) .join (' & ') })`
+    : op === OR     ? `(${ args .map (p) .join (' | ') })`
+    : op === CONC   ? `(${ args .map (p) .join ('')    })`
+    : op === ORS    ? `(${ args .map (p) .join (' | ') })`
+    : op === CONCS  ? `(${ args .map (p) .join ('')    })`
     : '' ) }
 
 function printRepeat (l, m) {
   return l === 0 && m === Infinity ? '*'
     : l === 1 && m === Infinity ? '+'
     : l === 0 && m === 1 ? '?'
-    : m === Infinity ? '<'+l+'-*>'
-    : '<'+l+'-'+m+'>'
+    : m === Infinity ? `<${l}-*>`
+    : `<${l}-${m}>`
 }
 
 
@@ -117,7 +117,7 @@ function SemiLattice (compareElement) {
 
 // 'Squash' Semigroup for flattening nested CONCs;
 // Implemented as concatenation of nonempty lists, possibly squashing
-// the last element of the first, with first element of the last. 
+// the last element of the first list with first element of the second list.
 
 function SquashSemiGroup (squash) {
   
@@ -136,7 +136,7 @@ function SquashSemiGroup (squash) {
 
 // Finally, the Normalised term store. 
 // This implements the regex signature,
-// but internally, uses a diffferent signature, with
+// but internally it uses a different signature, with
 // n-ary OR and CONC nodes. 
 
 function Normalised (Store = new Shared ()) {
@@ -185,24 +185,23 @@ return new (class Normalised {
   // a? = a<0,1> a* = a<0,*>  a+ = a<1,*>
 
   repeat (a1, least, most) {
-    // _<0,0> => epsilon
+    // _<0,0> => ε
+    // _<*,*> => ⊥
     // a<1,1> => a
-    // .<0,*> => top
-    // _<*,*> => bottom
-    // empty<l,m> = empty = _<0,0>
-    // top<l,m> => if l === 0 empty else top
-    // bot<l,m> => if l === 0 empty else bot
-    // any<0,*> => top
+    // .<0,*> => ⊤
+    // ε<l,m> = ε = _<0,0>
+    // ⊤<l,m> => if l === 0 ε else ⊤
+    // ⊥<l,m> => if l === 0 ε else ⊥
     // a<l,m><k,n> = a<l*k,m*n>
     const [c,x,l,m] = Store.out (a1)
     return most === 0 ? empty
       : least === Infinity ? bottom 
       : least === 1 && most === 1 ? a1
       : a1 === any && least === 0 && most === Infinity ? top
-      : a1 === empty ? empty
-      : a1 === top ? top
+      : a1 === empty  ? empty
+      : a1 === top    ? top
       : a1 === bottom ? bottom
-      : c === REPEAT ? Store.repeat (x, ordTimes (least, l), ordTimes (most, m))
+      : c === REPEAT  ? Store.repeat (x, ordTimes (least, l), ordTimes (most, m))
       : Store.repeat (a1, least, most)
   }
 

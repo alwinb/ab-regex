@@ -1,4 +1,4 @@
-.PHONY: all clean ess
+.PHONY: all clean ab-regex
 
 all: ab-regex
 ab-regex: dist/ab-regex.min.js

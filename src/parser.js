@@ -96,12 +96,13 @@ function evalLiteral (token, algApply) {
 }
 
 function evalToken (token, algApply) {
-  const r = token.type === T.Literal ? evalLiteral (token, algApply)
-    : token.type === T.Const ? algApply (token.name)
-    : token.name === 'repeat' ? parseRepeat (token) // ok this is different, a higher-order op.
-    : token.name === 'plus'   ? ['repeat', 1, Infinity]
-    : token.name === 'star'   ? ['repeat', 0, Infinity]
-    : token.name === 'opt'    ? ['repeat', 0, 1]
+  const r
+    = token.type === T.Literal ? evalLiteral (token, algApply)
+    : token.type === T.Const   ? algApply (token.name)
+    : token.name === 'repeat'  ? parseRepeat (token) // ok this is different, a higher-order op.
+    : token.name === 'plus'    ? ['repeat', 1, Infinity]
+    : token.name === 'star'    ? ['repeat', 0, Infinity]
+    : token.name === 'opt'     ? ['repeat', 0, 1]
     : token.name // Operators now... evalute to their name only; which s picked up by the apply function 
   return r
 }
