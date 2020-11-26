@@ -1,3 +1,4 @@
+const log = console.log.bind (console)
 
 // RangeLists
 // ==========
@@ -27,15 +28,15 @@ function RangeList (compareKey, compareValue) {
     }
 
     static byMapping (fn, list) {
-      return new RangeList (merge (fn, list.store, new Rest (), compareValue, compareKey))
+      return new this (merge (fn, list.store, new Rest (), compareValue, compareKey))
     }
 
     static byMerging (fn, list1, list2) {
-      return new RangeList (merge (fn, list1.store, list2.store, compareValue, compareKey))
+      return new this (merge (fn, list1.store, list2.store, compareValue, compareKey))
     }
 
     static fromConstant (value) {
-      return new RangeList (new Rest (value))
+      return new this (new Rest (value))
     }
 
     lookup (key) {
@@ -46,12 +47,12 @@ function RangeList (compareKey, compareValue) {
       return head.value
     }
 
-    *iterate () {
+    *iterate (fn = x => x) {
       let head = this.store
       while (head.constructor !== Rest) {
         yield head.value
-        const [d,k] = head.end
-        yield d === BELOW ? '|'+k : k+'|'
+        //const [d,k] = head.end
+        yield fn (head.end)
         head = head.tail
       }
       yield head.value
@@ -61,8 +62,12 @@ function RangeList (compareKey, compareValue) {
       return this._toArray () .join (' ')
     }
 
+    toArray (fn = x => x) {
+      return Array.from (this.iterate (fn))
+    }
+
     _toArray () {
-      return Array.from (this.iterate ())
+      return Array.from (this.iterate (([d,k]) => d === BELOW ? '|'+k : k+'|'))
     }
 
     _log () {
@@ -75,7 +80,10 @@ function RangeList (compareKey, compareValue) {
 // Range Sets are range lists with boolean output labels
 // This is nice because they now are a boolean algebra.
 
-function RangeSet (compareElement) {
+RangeSet.above = a => [ABOVE, a]
+RangeSet.below = a => [BELOW, a]
+
+function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.above } = { }) {
   if (typeof compareElement !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareElement function.')
   
@@ -91,29 +99,29 @@ function RangeSet (compareElement) {
     }
 
     static fromElement (a) {
-      return new RangeSet (new Upto ([BELOW, a], false, new Upto ([ABOVE, a], true, new Rest (false))))
+      return new RangeSet (new Upto (below (a), false, new Upto (above (a), true, new Rest (false))))
     }
 
     static fromRange (a, b) {
       const c = compareElement (a, b)
       if (c > 0) return RangeSet.bottom
-      return new RangeSet (new Upto ([BELOW, a], false, new Upto ([ABOVE, b], true, new Rest (false))))
+      return new RangeSet (new Upto (below (a), false, new Upto (above (b), true, new Rest (false))))
     }
 
     static uptoBelow (k) {
-      return new RangeSet (new Upto ([BELOW, k], true,  new Rest (false)))
+      return new RangeSet (new Upto (below (k), true,  new Rest (false)))
     }
     
-    static uptoAbove (k) {
-      return new RangeSet (new Upto ([ABOVE, k], true,  new Rest (false)))
+    static uptoabove (k) {
+      return new RangeSet (new Upto (above (k), true,  new Rest (false)))
     }
     
     static fromBelow (k) {
-      return new RangeSet (new Upto ([BELOW, k], false, new Rest (true)))
+      return new RangeSet (new Upto (below (k), false, new Rest (true)))
     }
     
-    static fromAbove (k) {
-      return new RangeSet (new Upto ([ABOVE, k], false, new Rest (true)))
+    static fromabove (k) {
+      return new RangeSet (new Upto (above (k), false, new Rest (true)))
     }
     
     static and (set1, set2) {
@@ -122,6 +130,10 @@ function RangeSet (compareElement) {
 
     static or (set1, set2) {
       return this.byMerging ((a,b) => a || b, set1, set2)
+    }
+    
+    negate () {
+      return this.constructor.byMapping (a => !a, this)
     }
   }
 
@@ -166,8 +178,8 @@ function merge (fn, xs1, xs2, cmpV, compareKey) {
     return new Rest (value)
 
   var decide = c1 === Rest && c2 !== Rest ? 1
-      : c1 !== Rest && c2 === Rest ?  -1
-      : compareBounds (compareKey) (xs1.end, xs2.end)
+    : c1 !== Rest && c2 === Rest ?  -1
+    : compareBounds (compareKey) (xs1.end, xs2.end)
 
   if (decide < 0) {
     tail = merge_ (xs1.tail, xs2)
