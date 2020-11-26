@@ -5,9 +5,10 @@ const { Normalised, _print } = require ('./normalize')
 const { RangeList, RangeSet } = require ('./rangelist')
 
 // One Level Unfoldings
-// These can be computed algebraically
-// depending on two algebras: 
+// --------------------
+// These can be computed algebraically, depending on two algebras: 
 // Normalised terms, and 'Accepts'
+// The carrier of the 'Accepts' algebra is the set { true, false }
 
 const Accepts = {
   bottom: false,
@@ -24,8 +25,12 @@ const Accepts = {
   conc:   (...args) => !args.includes (false),
 }
 
-// Derivs/ States is the algebra
-// based on the previously mentioned two
+// 'OneLevel' is a regular expression algebra that has as a carrier
+// the set of one-level unfoldings. Thus, it is the algebra that implements
+// the regular expression coalgebra. Yes that sounds confusing :)
+// A one-level unfolding, is a State object, consisting of a normalised term as id,
+// a boolen indicating if this is an accepting state, and a RangeList, from
+// chars to normalised derivative terms. 
 
 const first = ({term}) => term
 const second = ({accepts}) => accepts
@@ -64,13 +69,8 @@ function OneLevel (Terms = new Normalised ()) {
         //derivs.toString ()
       ] .join (' ')
     }
-
   }
 
-  //
-  //  And not that this works
-  //  want to normalise the delimiters
-  //
 
   return new (class OneLevel {
 
@@ -117,7 +117,7 @@ function OneLevel (Terms = new Normalised ()) {
   repeat ({ term, accepts, derivs }, least, most) {
     //log ('repeat', term, derivs.toString(), least, most)
     //log ('repeatTerm',  Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs).toString())
-    const newTerm = Terms.repeat (term, least, most) // NB callin gthis first; keep the heap ordered
+    const newTerm = Terms.repeat (term, least, most) // NB calling this first; keep the heap ordered
     const repeatTerm = Terms.repeat (term, Math.max (least-1, 0), Math.max (most-1, 0))
     return new State (
       newTerm,
@@ -167,9 +167,10 @@ function OneLevel (Terms = new Normalised ()) {
 
 // Compiler
 // ========
-// The compiler wraps around the Derivative, and Normalised (Term) algebras
+// The compiler wraps around the OneLevel, and Normalised (Term) algebras
 // When a one-level unfolding is computed, the derivative terms that are generated
-// in the process are stored in the Normalised store. 
+// in the process are stored in the Normalised store. These are then iteratively unfolded
+// as well, until no new terms appear. 
 
 function Compiler () {
   const Derivs = new OneLevel ()
@@ -182,7 +183,7 @@ function Compiler () {
 
   this._inspect = function* () {
     for (let s of states)
-      yield s+''
+      yield String (s)
   }
 
   this[Symbol.iterator] = function* () {
@@ -207,9 +208,9 @@ function Compiler () {
       return d
     }
     catch (e) {
-      console.log (`Error in ${this.constructor.name}.apply`)
-      console.log (`Calling ${json(fx[0])} on `, fx.slice(1), 'in Algebra'. this.constructor.name)
-      console.log (this [Symbol.iterator] ? [...this._inspect()] : this)
+      console.log (`Error in ${ this.constructor.name }.apply`)
+      console.log (`Calling ${ json(fx[0]) } on ${ fx.slice (1) }in Algebra${ this.constructor.name }`)
+      console.log (this [Symbol.iterator] ? [...this._inspect ()] : this)
       throw e
     }
   }
