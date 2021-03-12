@@ -1,5 +1,5 @@
 const log = console.log.bind (console)
-const { tokenize, parse } = require ('../src/parser')
+const { parse } = require ('../src/grammar')
 const { Shared, Normalised } = require ('../src/normalize')
 const { Compiler, OneLevel, _print } = require ('../src/dfa')
 const Regex = require ('../src/')
@@ -12,7 +12,7 @@ const samples = require ('./samples')
 function testCompiler (sample) {
   log ('\n', sample, '\n===================\n')
   const store = new Compiler ()
-  const ref = parse (sample, store)
+  const ref = parse (sample, store.apply.bind (store))
   log (ref.id, [...store._inspect()])
 }
 
@@ -26,7 +26,7 @@ samples.forEach (testCompiler)
 function testRun (sample, input) {
   log ('\nrun', sample, '(', input, ')\n===================\n')
   const store = new Compiler ()
-  const ref = parse (sample, store)
+  const ref = parse (sample, store.apply.bind (store))
   log (ref.id, [...store._inspect()])
   log (store.run (ref.id, input))
 }

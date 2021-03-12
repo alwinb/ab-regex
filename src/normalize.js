@@ -205,7 +205,11 @@ return new (class Normalised {
       : Store.repeat (a1, least, most)
   }
 
-  and (a1, a2) {
+  and (...as) {
+    return as.reduce (this.and2.bind (this))
+  }
+
+  and2 (a1, a2) {
     if (a1 === a2) return a1            // r & r = r
     if (a1 === bottom) return bottom    // ⊥ & r = ⊥
     if (a2 === bottom) return bottom    // r & ⊥ = ⊥
@@ -215,7 +219,12 @@ return new (class Normalised {
     return Store.and (a1, a2)
   }
   
-  or (a1, a2) {
+  or (...as) {
+    return as.reduce (this.or2.bind (this))
+  }
+
+  or2 (a1, a2) {
+    // FIXME new parser emits n-ary or
     const repeat = this.repeat.bind (this)
     if (a1 === top) return top          // ⊤ | r = ⊤
     if (a2 === top) return top          // r | ⊤ = ⊤
@@ -240,13 +249,17 @@ return new (class Normalised {
 
     const r = disjuncts.length === 1 ? disjuncts[0]
       : disjuncts.length === 2 ? Store.apply (OR, ...disjuncts)
-      : Store.apply (ORS, ...disjuncts)
+      : Store.apply (OR, ...disjuncts)
     
     //log ('stored', r, Store.out(r))
     return r
   }
 
-  conc (a1, a2) {
+  conc (...as) {
+    return as.reduce (this.conc2.bind (this))
+  }
+
+  conc2 (a1, a2) {
     if (a1 === bottom) return bottom    // ⊥ r = ⊥
     if (a2 === bottom) return bottom    // r ⊥ = ⊥
     if (a1 === empty) return a2         // ε r = r
@@ -260,7 +273,7 @@ return new (class Normalised {
     //log ('conc result', concats, concats.length === 1, concats[1])
     const r = joined.length === 1 ? joined[0]
       : joined.length === 2 ? Store.apply (CONC, ...joined)
-      : Store.apply (CONCS, ...joined)
+      : Store.apply (CONC, ...joined)
     //log ('stored', r)
     return r
   }

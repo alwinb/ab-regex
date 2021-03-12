@@ -127,11 +127,11 @@ function OneLevel (Terms = new Normalised ()) {
     )
   }
 
-  ors (...as) {
-    return as.reduce (this.or.bind (this))
+  or (...as) {
+    return as.reduce (this.or2.bind (this))
   }
 
-  or (left, right) {
+  or2 (left, right) {
     return new State (
       Terms.or (left.term, right.term),
       Accepts.or (left.accepts, right.accepts), 
@@ -139,7 +139,11 @@ function OneLevel (Terms = new Normalised ()) {
     )
   }
 
-  and (left, right) {
+  and (...as) {
+    return as.reduce (this.and2.bind (this))
+  }
+
+  and2 (left, right) {
     return new State (
       Terms.and (left.term, right.term),
       Accepts.and (left.accepts, right.accepts), 
@@ -147,11 +151,11 @@ function OneLevel (Terms = new Normalised ()) {
     )
   }
 
-  concs (...as) {
-    return as.reduce (this.conc.bind(this))
+  conc (...as) {
+    return as.reduce (this.conc2.bind(this))
   }
 
-  conc (head, tail) {
+  conc2 (head, tail) {
     //log ('calling conc', head, tail)
     const newTerm = Terms.conc (head.term, tail.term)
     const left = Derivs.byMapping (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
