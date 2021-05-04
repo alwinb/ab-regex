@@ -24,29 +24,20 @@ The main concept is that of a regular expression algebra. This is modeled in jav
 1. As a function, typically called `apply` that takes an operator name as its first argument and operands as subsequent arguments. 
 2. As an object/ dictionary, that has for each nullary operator, a constant property by the operator name, and for each non-nullary operator, a method by the operator name that takes its operands as arguments. 
 
-The _carrier_ of the algebra can be modeled in several ways: 
-
-1. _implicitly_, meaning that elements of the carrier are represented and stored in memory in order to be passed to the algebra functions as above, but without storing the entire carrier in memory, or
-2. _explicitly_, meaning that the carrier and all of its elements are represented and stored in memory.  
-
-The carriers of most of the relevant algebras are not finite however, making an explicit model impossible. Instead I use a hybrid of implicit and explicit, where a finite subset of the carrier is explicitly modeled and allowed to grow on demand. 
 
 * * * 
 
+Concepts and Data structures:
+
 - Signature
-- Shared
-- Normalised
 - RangeList
 - State
+
+Regular expression Algebras:
+
+- Shared
+- Normalised
 - Accepts
 - OneLevel
 - Compiler
-
-
-### The Term Algebra
-
-Term algebras, equivalently, _initial_ algebras are _minimal_, which means that they have no proper subalgebras. This in turn implies that any two equivalent terms are present in the carrier as one and the same element. Taking this further, it also implies that equivalent subterms are present as one and the same element. Thus terms are 'stored' in the initial algebra as fully-subterm-shared. Thus, they are directed acyclic graphs. They are not trees.
-
-
-
 
