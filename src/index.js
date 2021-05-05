@@ -1,4 +1,4 @@
-const { tokenize, parse } = require ('./parser')
+const { parse } = require ('../src/grammar')
 const { TermStore, Compiler } = require ('./dfa')
 
 class Regex {
@@ -6,7 +6,7 @@ class Regex {
   constructor (arg = { }) {
     if (typeof arg === 'string') return new Regex ({ fromString:arg })
     const { store = new Compiler (), fromString = '' } = arg
-    const delta = parse (String (fromString), store)
+    const delta = parse (String (fromString), store.apply.bind (store))
     Object.defineProperties (this, {
       _store: { value:store },
       state: { value:delta.id },

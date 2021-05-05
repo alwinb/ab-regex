@@ -24,8 +24,8 @@ const Operators =  {
   OR : 'or', 
   CONC : 'conc', 
   // Hacked in here, used by normalise
-  ORS: 'ors',
-  CONCS: 'concs',
+  // ORS: 'ors',
+  // CONCS: 'concs',
 }
 
 const {
@@ -95,10 +95,11 @@ class Algebra {
         : object [op] (...args)
       }
       catch (e) {
-        console.log (`Error in ${object.constructor.name}.apply`)
+        const msg = `Error in ${object.constructor.name}.apply`
+        console.log (msg)
         console.log (`Calling ${json(op)} on `, args, 'in Algebra')
         console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
-        throw e
+        throw new Error (msg)
       }
     }
   }
@@ -113,7 +114,7 @@ class Algebra {
       range:  (a, b)  => apply (RANGE, a, b),
       group:  (r)     => apply (GROUP, r   ),
       repeat: (r,l,m) => apply (REPEAT, r, l, m),
-      star:   (r)     => apply (STAR,  r   ),
+      star:   (r)     => apply (REPEAT, r, 0, Infinity),
       plus:   (r)     => apply (PLUS,  r   ),
       opt:    (r)     => apply (OPT,   r   ),
       not:    (r)     => apply (NOT,   r   ),
