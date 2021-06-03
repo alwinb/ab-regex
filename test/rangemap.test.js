@@ -1,4 +1,4 @@
-const { RangeList, RangeSet } = require ('../src/rangelist')
+const { RangeMap, RangeSet } = require ('../src/rangemap')
 const assert = require ('assert') .strict
 const log = console.log.bind (console)
 

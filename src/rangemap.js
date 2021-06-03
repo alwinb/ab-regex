@@ -93,10 +93,10 @@ log (xs, 'lookup', 11, lookup (xs, 11, cmp) )
 */
 
 
-// RangeList API
-// -------------
+// RangeMap API
+// ------------
 
-function RangeList (compareKey, compareValue) {
+function RangeMap (compareKey, compareValue) {
   const compareD = compareDelim (compareKey)
   const compareKD = compareAgainstDelim (compareKey)
 
@@ -106,7 +106,7 @@ function RangeList (compareKey, compareValue) {
   if (typeof compareValue !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareValue function.')
 
-  return class RangeList {
+  return class RangeMap {
 
     constructor (store) {
       this.store = Array.from (store)
@@ -166,7 +166,7 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
   if (typeof compareElement !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareElement function.')
   const compareBoolean = (a, b) => !a ? !b ? 0 : -1 : b ? 0 : 1
-  class RangeSet extends RangeList (compareElement, compareBoolean) {
+  class RangeSet extends RangeMap (compareElement, compareBoolean) {
 
     get full () {
       return new RangeSet ([true])
@@ -225,4 +225,4 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
   return RangeSet
 }
 
-module.exports = { RangeList, RangeSet }
+module.exports = { RangeMap, RangeSet }

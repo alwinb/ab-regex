@@ -2,7 +2,7 @@ const log = console.log.bind (console)
 const json = x => JSON.stringify (x, null, 2)
 const { Algebra } = require ('./signature')
 const { Normalised, _print } = require ('./normalize')
-const { RangeList, RangeSet } = require ('./rangelist')
+const { RangeMap, RangeSet } = require ('./rangemap')
 
 // One Level Unfoldings
 // --------------------
@@ -29,7 +29,7 @@ const Accepts = {
 // the set of one-level unfoldings. Thus, it is the algebra that implements
 // the regular expression coalgebra. Yes that sounds confusing :)
 // A one-level unfolding, is a State object, consisting of a normalised term as id,
-// a boolen indicating if this is an accepting state, and a RangeList, from
+// a boolen indicating if this is an accepting state, and a RangeMap, from
 // chars to normalised derivative terms. 
 
 const first = ({term}) => term
@@ -43,7 +43,7 @@ const CharSet = RangeSet (compareChar)
 
 function OneLevel (Terms = new Normalised ()) {
 
-  const Derivs = RangeList (compareChar, Terms.compare)
+  const Derivs = RangeMap (compareChar, Terms.compare)
   const print = x => _print (Terms.out, x)
 
   class State {
@@ -51,12 +51,12 @@ function OneLevel (Terms = new Normalised ()) {
       this.id = term
       this.term = term
       this.accepts = accepts
-      this.derivs = derivs   // a RangeList of successor states
+      this.derivs = derivs   // a RangeMap of successor states
     }
 
     *[Symbol.iterator] () {
       const { id, term, accepts, derivs } = this
-      yield* [id, print (term), accepts, ... RangeList (compareChar, cmpJs). byMapping (print, derivs) .toArray () ]
+      yield* [id, print (term), accepts, ... RangeMap (compareChar, cmpJs). byMapping (print, derivs) .toArray () ]
     }
 
     toString () {
@@ -65,7 +65,7 @@ function OneLevel (Terms = new Normalised ()) {
         term,
         print (term),
         accepts,
-        `[ ${ RangeList (compareChar, cmpJs).byMapping (print, derivs) } ]`
+        `[ ${ RangeMap (compareChar, cmpJs).byMapping (print, derivs) } ]`
         //derivs.toString ()
       ] .join (' ')
     }
