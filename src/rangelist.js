@@ -1,19 +1,104 @@
 const log = console.log.bind (console)
 
-// RangeLists
-// ==========
+// Range Lists
+// ===========
 
-// A purely functional datastructure for representing 
-// sets of continuous ranges; and their generalisation;
-// functions that map continuous ranges to the same values. 
+// A datastructure for representing sets of continuous ranges and
+// their generalisation: maps from continuous ranges to values. 
 
-const [BELOW, ABOVE] = [Symbol ('Below'), Symbol ('Above')]
+// Range Lists are stored as arrays of odd length
+// [value, (delimiter, value)*]
 
-const compareBounds = cmpK => ([c1,x1], [c2,x2]) =>
-  cmpK (x1, x2) || (c1 === c2 ? 0 : c1 === BELOW ? -1 : 1)
+const [BELOW, ABOVE] =
+  [Symbol ('Below'), Symbol ('Above')]
 
+const compareDelim = cmpK =>
+  ([c1,x1], [c2,x2]) =>
+    cmpK (x1, x2) || (c1 === c2 ? 0 : c1 === BELOW ? -1 : 1)
+
+const compareAgainstDelim = cmpK =>
+  (k1, [delim,k2]) =>
+    cmpK (k1, k2) || (delim === ABOVE ? -1 : 1)
+
+
+// ### Lookup
+
+function lookup (xs, key, cmpKD = cmp) {
+  let di = 1, l = xs.length;
+  for (; di < xs.length && cmpKD (key, xs[di]) >= 0; di+=2);
+  return xs[di-1]
+}
+
+// ### Merge
+
+function* merge (fn, xs, ys, cmpD = cmp, cmpV = cmp) {
+  xs = xs [Symbol.iterator] ()
+  ys = ys [Symbol.iterator] ()
+  let { value:x } = xs.next ()
+  let { value:y } = ys.next ()
+  let { value:sepx, done:lastx } = xs.next ()
+  let { value:sepy, done:lasty } = ys.next ()
+  let xy = fn (x, y)
+
+  while (!(lastx && lasty)) { let dord
+    const [sep, decide]
+      = !lastx && lasty ? [sepx, -1]
+      : lastx && !lasty ? [sepy, 1]
+      : (dord = cmpD (sepx, sepy)) > 0 ? [sepy, 1]
+      : [sepx, dord]
+
+    if (decide <= 0) (
+      { value:x } = xs.next (),
+      { value:sepx, done:lastx } = xs.next () )
+
+    else if (decide >= 0) (
+      { value:y } = ys.next (),
+      { value:sepy, done:lasty } = ys.next () )
+    
+    const v = fn (x, y)
+    if (cmpV (v, xy) !== 0) {
+      yield* [xy, sep];
+      xy = v
+    }
+  }
+  
+  yield xy
+}
+
+
+// Test
+// ----
+
+/*const cmp = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
+
+var xs = [ true, 0, false, 10, true]
+var ys = [ false, 6, true ]
+var zs = [ false, 0, false, 1, false, 2, true, 4, false]
+var top = [ true ]
+
+const pair = (a, b) => [a,b]
+const snd = (a, b) => b
+const fst = (a, b) => a
+const and = (a, b) => a && b
+const or = (a, b) => a || b
+
+log (... merge (pair, xs, ys))
+log (... merge (or, top, zs))
+log (xs, 'lookup', -1, lookup (xs, -1, cmp) )
+log (xs, 'lookup', 0, lookup (xs, 0,   cmp) )
+log (xs, 'lookup', 1, lookup (xs, 1,   cmp) )
+log (xs, 'lookup', 9, lookup (xs, 9,   cmp) )
+log (xs, 'lookup', 10, lookup (xs, 10, cmp) )
+log (xs, 'lookup', 11, lookup (xs, 11, cmp) )
+*/
+
+
+// RangeList API
+// -------------
 
 function RangeList (compareKey, compareValue) {
+  const compareD = compareDelim (compareKey)
+  const compareKD = compareAgainstDelim (compareKey)
 
   if (typeof compareKey !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareKey function.')
@@ -24,50 +109,41 @@ function RangeList (compareKey, compareValue) {
   return class RangeList {
 
     constructor (store) {
-      this.store = store
+      this.store = Array.from (store)
     }
 
     static byMapping (fn, list) {
-      return new this (merge (fn, list.store, new Rest (), compareValue, compareKey))
+      return new this (merge (fn, list.store, [null], compareD, compareValue))
     }
 
     static byMerging (fn, list1, list2) {
-      return new this (merge (fn, list1.store, list2.store, compareValue, compareKey))
+      return new this (merge (fn, list1.store, list2.store, compareD, compareValue))
     }
 
     static fromConstant (value) {
-      return new this (new Rest (value))
+      return new this ([value])
     }
 
     lookup (key) {
-      const compare = (key, [delim,k2]) => compareKey (key, k2) || (delim === ABOVE ? -1 : 1)
-      let head = this.store
-      while (head instanceof Upto && compare (key, head.end) > 0)
-        head = head.tail
-      return head.value
-    }
-
-    *iterate (fn = x => x) {
-      let head = this.store
-      while (head.constructor !== Rest) {
-        yield head.value
-        //const [d,k] = head.end
-        yield fn (head.end)
-        head = head.tail
-      }
-      yield head.value
+      return lookup (this.store, key, compareKD)
     }
 
     toString () {
-      return this._toArray () .join (' ')
+      return this._toString () .join ('')
     }
 
     toArray (fn = x => x) {
-      return Array.from (this.iterate (fn))
+      return this.store // Array.from (this.iterate (fn))
     }
 
-    _toArray () {
-      return Array.from (this.iterate (([d,k]) => d === BELOW ? '|'+k : k+'|'))
+    _toString () {
+      const r = [this.store[0]]
+      for (let i=1; i<this.store.length; i+=2) {
+        if (this.store[i][0] === BELOW) r.push (' |', this.store[i][1], ' ')
+        else r.push (' ', this.store[i][1], '| ')
+        r.push (this.store[i+1])
+      }
+      return r // this.store // Array.from (this.iterate (([d,k]) => d === BELOW ? '|'+k : k+'|'))
     }
 
     _log () {
@@ -77,6 +153,9 @@ function RangeList (compareKey, compareValue) {
   }
 }
 
+
+// RangeSet API
+// ------------
 // Range Sets are range lists with boolean output labels
 // This is nice because they now are a boolean algebra.
 
@@ -86,42 +165,41 @@ RangeSet.below = a => [BELOW, a]
 function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.above } = { }) {
   if (typeof compareElement !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareElement function.')
-  
   const compareBoolean = (a, b) => !a ? !b ? 0 : -1 : b ? 0 : 1
   class RangeSet extends RangeList (compareElement, compareBoolean) {
 
     get full () {
-      return new RangeSet (new Rest (true))
+      return new RangeSet ([true])
     }
 
     static get empty () {
-      return new RangeSet (new Rest (false))
+      return new RangeSet ([false])
     }
 
     static fromElement (a) {
-      return new RangeSet (new Upto (below (a), false, new Upto (above (a), true, new Rest (false))))
+      return new RangeSet ([false, below (a), true, above (a), false])
     }
 
     static fromRange (a, b) {
       const c = compareElement (a, b)
       if (c > 0) return RangeSet.bottom
-      return new RangeSet (new Upto (below (a), false, new Upto (above (b), true, new Rest (false))))
+      return new RangeSet ([false, below (a), true, above (b), false])
     }
 
     static uptoBelow (k) {
-      return new RangeSet (new Upto (below (k), true,  new Rest (false)))
+      return new RangeSet ([true, below (k), false])
     }
     
     static uptoabove (k) {
-      return new RangeSet (new Upto (above (k), true,  new Rest (false)))
+      return new RangeSet ([true, above (k), false])
     }
     
     static fromBelow (k) {
-      return new RangeSet (new Upto (below (k), false, new Rest (true)))
+      return new RangeSet ([false, below (k), true])
     }
     
     static fromabove (k) {
-      return new RangeSet (new Upto (above (k), false, new Rest (true)))
+      return new RangeSet ([false, above (k), true])
     }
     
     static and (set1, set2) {
@@ -131,9 +209,13 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
     static or (set1, set2) {
       return this.byMerging ((a,b) => a || b, set1, set2)
     }
+
+    static not (set1) {
+      return this.byMapping (a => !a, set1)
+    }
     
     negate () {
-      return this.constructor.byMapping (a => !a, this)
+      return this.byMapping (a => !a, this)
     }
   }
 
@@ -141,64 +223,6 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
   RangeSet.prototype.test = RangeSet.prototype.lookup
 
   return RangeSet
-}
-
-
-// Internal structure
-// ------------------
-
-class Upto {
-  constructor (key, value, tail) {
-    this.value = value
-    this.end = key
-    this.tail = tail
-  }
-}
-
-class Rest {
-  constructor (value) { 
-    this.value = value
-  }
-}
-
-// merge; zips together two rangeLists,
-// merging their output values together with a function fn
-// NB note that cmpV is a comparison on the _output_ type of fn
-// this is used to coalesce adjacent ranges that
-// have begotten the same output value. 
-
-function merge (fn, xs1, xs2, cmpV, compareKey) {
-  const c1 = xs1.constructor
-    , c2 = xs2.constructor
-    , value = fn (xs1.value, xs2.value)
-    , merge_ = (xs1, xs2) => merge (fn, xs1, xs2, cmpV, compareKey)
-  let tail
-
-  if (c1 === Rest && c2 === Rest)
-    return new Rest (value)
-
-  var decide = c1 === Rest && c2 !== Rest ? 1
-    : c1 !== Rest && c2 === Rest ?  -1
-    : compareBounds (compareKey) (xs1.end, xs2.end)
-
-  if (decide < 0) {
-    tail = merge_ (xs1.tail, xs2)
-    return (cmpV (tail.value, value) === 0) ? tail
-      : new Upto (xs1.end, value, tail)
-  }
-
-  else if (decide === 0) {
-    tail = merge_ (xs1.tail, xs2.tail)
-    return (cmpV (tail.value, value) === 0) ? tail
-      : new Upto (xs1.end, value, tail)
-  }
-
-  else if (decide > 0) {
-    tail = merge_ (xs1, xs2.tail)
-    return (cmpV (tail.value, value) === 0) ? tail
-      : new Upto (xs2.end, value, tail)
-  }
-
 }
 
 module.exports = { RangeList, RangeSet }
