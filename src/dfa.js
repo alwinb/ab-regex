@@ -4,6 +4,19 @@ const { Algebra } = require ('./signature')
 const { Normalised, _print } = require ('./normalize')
 const { RangeMap, RangeSet } = require ('./rangemap')
 
+// CharSets
+// --------
+
+const cmpJs = (t1, t2) =>
+  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
+
+const above = cp =>
+  RangeSet.below (cp + 1)
+
+const CharMap = RangeMap (cmpJs, cmpJs, { above })
+const CharSet = RangeSet (cmpJs, { above })
+
+
 // One Level Unfoldings
 // --------------------
 // These can be computed algebraically, depending on two algebras: 
@@ -36,14 +49,9 @@ const first = ({term}) => term
 const second = ({accepts}) => accepts
 const third = ({derivs}) => derivs
 
-const cmpJs = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-const compareChar = cmpJs
-const CharSet = RangeSet (compareChar)
-
-
 function OneLevel (Terms = new Normalised ()) {
 
-  const Derivs = RangeMap (compareChar, Terms.compare)
+  const Derivs = RangeMap (cmpJs, Terms.compare)
   const print = x => _print (Terms.out, x)
 
   class State {
@@ -56,7 +64,7 @@ function OneLevel (Terms = new Normalised ()) {
 
     *[Symbol.iterator] () {
       const { id, term, accepts, derivs } = this
-      yield* [id, print (term), accepts, ... RangeMap (compareChar, cmpJs). mapped (print, derivs) .store ]
+      yield* [id, print (term), accepts, ... Derivs.mapped (print, derivs) .store ]
     }
 
     toString () {
@@ -65,7 +73,7 @@ function OneLevel (Terms = new Normalised ()) {
         term,
         print (term),
         accepts,
-        `[ ${ RangeMap (compareChar, cmpJs).mapped (print, derivs) } ]`
+        `[ ${ Derivs.mapped (print, derivs) } ]`
         //derivs.toString ()
       ] .join (' ')
     }
