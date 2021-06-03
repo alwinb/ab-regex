@@ -39,6 +39,7 @@ function* merge (fn, xs, ys, cmpD = cmp, cmpV = cmp) {
   let { value:sepx, done:lastx } = xs.next ()
   let { value:sepy, done:lasty } = ys.next ()
   let xy = fn (x, y)
+  // log ('combined first', {x, y, v:xy})
 
   while (!(lastx && lasty)) { let dord
     const [sep, decide]
@@ -51,11 +52,12 @@ function* merge (fn, xs, ys, cmpD = cmp, cmpV = cmp) {
       { value:x } = xs.next (),
       { value:sepx, done:lastx } = xs.next () )
 
-    else if (decide >= 0) (
+    if (decide >= 0) (
       { value:y } = ys.next (),
       { value:sepy, done:lasty } = ys.next () )
     
     const v = fn (x, y)
+    // log ('combined', {last:xy, x, y, v})
     if (cmpV (v, xy) !== 0) {
       yield* [xy, sep];
       xy = v
@@ -69,8 +71,8 @@ function* merge (fn, xs, ys, cmpD = cmp, cmpV = cmp) {
 // Test
 // ----
 
-/*const cmp = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-
+/*
+const cmp = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 var xs = [ true, 0, false, 10, true]
 var ys = [ false, 6, true ]
 var zs = [ false, 0, false, 1, false, 2, true, 4, false]
@@ -81,23 +83,29 @@ const snd = (a, b) => b
 const fst = (a, b) => a
 const and = (a, b) => a && b
 const or = (a, b) => a || b
+const eq = (a, b) => a === b
 
-log (... merge (pair, xs, ys))
-log (... merge (or, top, zs))
+/*
+log (xs, ... merge (eq,  xs, xs))
+log (xs, ... merge (or, top, xs))
+log (xs, ... merge (pair, xs, ys))
 log (xs, 'lookup', -1, lookup (xs, -1, cmp) )
 log (xs, 'lookup', 0, lookup (xs, 0,   cmp) )
 log (xs, 'lookup', 1, lookup (xs, 1,   cmp) )
 log (xs, 'lookup', 9, lookup (xs, 9,   cmp) )
 log (xs, 'lookup', 10, lookup (xs, 10, cmp) )
 log (xs, 'lookup', 11, lookup (xs, 11, cmp) )
-*/
+//*/
 
 
 // RangeMap API
 // ------------
 
-function RangeMap (compareKey, compareValue) {
-  const compareD = compareDelim (compareKey)
+RangeMap.above = a => [ABOVE, a]
+RangeMap.below = a => [BELOW, a]
+
+function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = RangeMap.above } = { }) {
+  const compareD  = compareDelim (compareKey)
   const compareKD = compareAgainstDelim (compareKey)
 
   if (typeof compareKey !== 'function')
@@ -113,11 +121,12 @@ function RangeMap (compareKey, compareValue) {
     }
 
     static byMapping (fn, list) {
+      // FIXME need to handle above/ below normalisations
       return new this (merge (fn, list.store, [null], compareD, compareValue))
     }
 
     static byMerging (fn, list1, list2) {
-      return new this (merge (fn, list1.store, list2.store, compareD, compareValue))
+      return new this (merge (fn, list1.store, list2.store, compareD, compareValue, { below, above }))
     }
 
     static fromConstant (value) {
@@ -210,18 +219,21 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
       return this.byMerging ((a,b) => a || b, set1, set2)
     }
 
+    static diff (set1, set2) {
+      return this.byMerging ((a,b) => a !== b, set1, set2)
+    }
+
     static not (set1) {
       return this.byMapping (a => !a, set1)
     }
     
     negate () {
-      return this.byMapping (a => !a, this)
+      return RangeSet.not (this)
     }
   }
 
   RangeSet.prototype.top = RangeSet.prototype.full
   RangeSet.prototype.test = RangeSet.prototype.lookup
-
   return RangeSet
 }
 
