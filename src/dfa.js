@@ -41,9 +41,9 @@ const Accepts = {
 // 'OneLevel' is a regular expression algebra that has as a carrier
 // the set of one-level unfoldings. Thus, it is the algebra that implements
 // the regular expression coalgebra. Yes that sounds confusing :)
-// A one-level unfolding, is a State object, consisting of a normalised term as id,
-// a boolen indicating if this is an accepting state, and a RangeMap, from
-// chars to normalised derivative terms. 
+// A one-level unfolding, is a State { term, accepts, derivs } object,
+// consisting of a normalised term as an id, an'accepts' boolean, and
+// a RangeMap, from chars to normalised derivative regexp terms. 
 
 const first = ({term}) => term
 const second = ({accepts}) => accepts
@@ -181,9 +181,9 @@ function OneLevel (Terms = new Normalised ()) {
 // Compiler
 // ========
 // The compiler wraps around the OneLevel, and Normalised (Term) algebras
-// When a one-level unfolding is computed, the derivative terms that are generated
-// in the process are stored in the Normalised store. These are then iteratively unfolded
-// as well, until no new terms appear. 
+// When a one-level unfolding is computed, any new derivative terms that are
+// generated in the process are stored in the Normalised store as well.
+// These are iterativbely unfolded as well, until no new terms appear.
 
 function Compiler () {
   const Derivs = new OneLevel ()
