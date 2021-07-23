@@ -226,37 +226,8 @@ function Compiler (Terms = new Normalised ()) {
   Object.assign (this, { fail, states, compile, get, run, _inspect })
 }
 
-// Test
-// ====
 
-const store = new Compiler ()
+// Exports
+// -------
 
-const root = store.compile ({
-  atom:    `true|false|null`,
-  symbol:  `([a-z]|[A-Z])([a-z]|[A-Z]|[0-9])*`,
-  number:  `0|[1-9][0-9]*`,
-  hex:     `0x([0-9]|[a-f]|[A-F])+`,
-  space:   `([ - ]|[\t-\t])+`,
-  newline: `[\r-\r]?[\n-\n]|[\r-\r]`
-  // other: '.+',
-})
-
-// Cool, this works
-// log (store.states)
-// log (store, root, store.get (root))
-
-store.run ('null ')
-store.run ('true ')
-store.run ('nulls ')
-store.run ('019 ')
-store.run ('019 ', 3)
-store.run ('0x129Fa- ')
-store.run ('\n ')
-store.run ('\n\r ')
-store.run ('\r\n ')
-store.run ('\r ')
-
-
-log ([...store._inspect ()])
-
-
+module.exports = { Compiler, compare, compareArray }

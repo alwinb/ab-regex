@@ -1,5 +1,8 @@
 const { parse } = require ('../src/grammar')
 const { TermStore, Compiler } = require ('./dfa')
+const TS = require ('./tokenset')
+
+// Regex Top Level API
 
 class Regex {
 
@@ -43,4 +46,22 @@ class Reducer {
 
 }
 
-module.exports = Regex
+// TokenSet Top Level API
+// Quickly added - TODO clean up
+
+class TokenSet {
+
+  constructor (dict, store = new TS.Compiler ()) {
+    this.state = store.compile (dict)
+    this.acceps = this.state.accepts
+    this.store = store
+  }
+
+  exec (input, _pos = 0) {
+    // TODO clean up the run API
+    return this.store.run (input, _pos, this.state) .token
+  }
+
+}
+
+module.exports = { Regex, TokenSet }

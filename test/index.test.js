@@ -1,9 +1,12 @@
-const Regex = require ('../src')
+const { Regex, TokenSet } = require ('../src')
 const assert = require ('assert') .strict
 const log = console.log.bind (console)
 
 // Test Regex Object
 // =================
+
+log ('\nTest Regex Object')
+log ('=================\n')
 
 // General
 
@@ -15,7 +18,6 @@ assert.equal (r.test ('bar'), true)
 assert.equal (r.test ('barr'), true)
 assert.equal (r.test ('barrrr'), true)
 assert.equal (r.test ('barrrrs'), false)
-
 
 // Quantifier
 
@@ -66,7 +68,6 @@ assert.equal (r.test ('ababx'), true)
 assert.equal (r.test ('abababx'), true)
 assert.equal (r.test ('ababax'), false)
 
-
 // Any char
 
 var r = new Regex ('a.c')
@@ -75,7 +76,6 @@ assert.equal (r.test ('axc'), true)
 assert.equal (r.test ('acc'), true)
 assert.equal (r.test ('acd'), false)
 assert.equal (r.test ('dcc'), false)
-
 
 // Conjunction and negation
 
@@ -86,18 +86,37 @@ assert.equal (r.test ('Yyc'), false)
 assert.equal (r.test ('aaX'), false)
 assert.equal (r.test ('acc'), true)
 
+log ('All OK')
 
+// Test TokenSet Object
+// ====================
 
+log ('\nTest TokenSet Object')
+log ('====================\n')
 
 //
-//  Incremental/ reducer
-//
+
+const spec = {
+  atom:'true|false|null',
+  symbol:'[a-z]+'
+}
+
+const t = new TokenSet (spec)
+
+// log (...t.store._inspect())
+log (t.exec ('foo bar'))
+log (t.exec ('fofalse bar', 0))
+log (t.exec ('fofalse bar', 2))
+
+
+// Incremental/ reducer
+// ====================
 
 var r = new Regex ('ab*x')
 log ('\n', r)
 log ('Regex.test', r.test ('abbbx'))
 red = r.createReducer ()
-log ('\nreduce\n=========')
+log ('\nReduce\n======')
 for (let chunk of ['ab', 'bbb', 'x', 'a']) {
   log (chunk)
   red.write (chunk)

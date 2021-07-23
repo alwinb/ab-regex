@@ -9,6 +9,11 @@ var samples = [
   '.',
   'a',
   '[a-z]', 
+  '[a]', 
+  '[ac]', 
+  '[a-zA-Z]',
+
+
   
   // Disjunction
 

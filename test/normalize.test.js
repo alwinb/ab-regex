@@ -1,7 +1,7 @@
 const log = console.log.bind (console)
 const { parse } = require ('../src/grammar')
 const { Shared, Normalised, _print } = require ('../src/normalize')
-const samples = require ('./samples')
+var samples = require ('./samples')
 
 //
 //  Test Normalisation
