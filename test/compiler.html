@@ -1,93 +1,36 @@
-<meta charset="utf-8">
-<script src="../dist/ab-regex.min.js"></script>
-<style>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style/base.css">
+  <script src="../dist/ab-regex.min.js"></script>
 
-  /* Styles for debugging */
+  <style>
 
-  html.debug * {
-    outline:1px solid #0004;
-    opacity:.9;
-  }
+    body { font-size:18px; margin:3rem 2rem 2rem;}
 
-  html.debug {
-    /* show the 1rem baseline rhythm */
-    background:repeating-linear-gradient(to bottom, #0000, #0000 calc(1rem - 1px), #ccc calc(1rem - 1px), #ccc 1rem, #0000 1rem);
-  }
+    .selected {
+      background:teal;
+      color:white;
+    }
+    
+    table {
+      line-height:1.25rem;
+    }
 
+    input {
+      width:calc(100% - 5em);
+      line-height:1.5rem;
+      padding:0 .3em;
+    }
 
-  /* Establish a vertial rhythm by using
-    one rem unit as a global line-height unit */
+    button {
+      line-height:1.5rem;
+      width:em;
+    }
 
-  :root, body { 
-    font-size:32px;
-    margin:0;
-    padding:0;
-  }
+  </style>
+</head>
 
-  * {
-    line-height:1rem;
-    box-sizing:border-box;
-  }
-  
-  body :not(h1,h2,h3,h4,h5,h6) {
-    font-size:inherit;
-  }
-
-  /* Block elements followed by a blank line */
-  hr,p,ol,ul,dl,table,form,blockquote,pre,figure,img,video,canvas,h1,h2 {
-    display:block;
-    margin-top:0;
-    margin-bottom:1rem;
-  }
-
-  /* No extra line after :last-child */
-  hr:last-child,p:last-child,ol:last-child,ul:last-child,dl:last-child,table:last-child,form:last-child,
-  blockquote:last-child,pre:last-child,figure:last-child,img:last-child,video:last-child,canvas:last-child,
-  h1:last-child,h2:last-child {
-    margin-bottom:0;
-  }
-
-  /* Block elements without extra line */
-  header,main,aside,article,footer,nav,div,dd,dt,fieldset,legend,figcaption,h3,h4,h5,h6,label {
-    display:block;
-    margin-top:0;
-    margin-bottom:0;
-  }
-
-  /** End of the vr **/
-  /* Table and horizontal rule */
-  table {
-  	border-spacing:0;
-    border-collapse:collapse;
-    border:1px solid currentColor;
-  }
-
-  hr {
-    border:1px solid currentColor;
-    margin:-1px 0 -1px 0;
-  }
-
-  /***/
-  body { font-size:18px; margin:3rem 1rem 1rem;}
-  td, th{
-    padding:0 1em;
-    border:1px solid currentColor;
-  }
-  .selected {
-    background:teal;
-    color:white;
-  }
-
-  input {
-    width:calc(100% - 5em);
-    padding:0 .3em;
-  }
-  button {
-    width:5em;
-  }
-
-</style>
-<body>
+<body class=serif>
 <h1>Regular Expression Compiler</h1>
 <form>
   <input id=regex><button>Compile</button>
@@ -129,6 +72,7 @@
       rows [r.state].classList.add ('selected')
 
       let table = elem `table` ()
+      table.classList.add ('lines')
       table.append (...['state', 'accepts', 'successors'].map (elem `th`))
       table.append (...rows)
       output.innerHTML = null
@@ -138,11 +82,8 @@
       throw e
     }
   }
-  
 
   input.value = 'a|b|c*'
   show ('a|b|c*')
-
-
 
 </script>
