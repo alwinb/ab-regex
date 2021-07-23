@@ -21,13 +21,12 @@ var set3 = CharSet
 
 
 // Just a quick manual check
-set1._log ()
-set2._log ()
 
-CharSet.and (set1, set2) ._log ()
-CharSet.or  (set1, set2) ._log ()
-CharSet.or  (set1, set3) ._log ()
-
+log (set1.store)
+log (set2.store)
+log (CharSet.and (set1, set2).store)
+log (CharSet.or  (set1, set2).store)
+log (CharSet.or  (set1, set3).store)
 
 // Test lookup
 assert.equal (set1.lookup ('a'), true)

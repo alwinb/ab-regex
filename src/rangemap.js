@@ -1,13 +1,14 @@
 const log = console.log.bind (console)
 
-// Range Lists
-// ===========
+// Range Maps
+// ==========
 
 // A datastructure for representing sets of continuous ranges and
 // their generalisation: maps from continuous ranges to values. 
 
 // Range Lists are stored as arrays of odd length
 // [value, (delimiter, value)*]
+// where the delimiter is either [ABOVE, key] or [BELOW, key]
 
 const [BELOW, ABOVE] =
   [Symbol ('Below'), Symbol ('Above')]
@@ -17,9 +18,8 @@ const compareDelim = cmpK =>
     cmpK (x1, x2) || (c1 === c2 ? 0 : c1 === BELOW ? -1 : 1)
 
 const compareAgainstDelim = cmpK =>
-  (k1, [delim,k2]) =>
-    cmpK (k1, k2) || (delim === ABOVE ? -1 : 1)
-
+  (k1, [bound, k2]) =>
+    cmpK (k1, k2) || (bound === ABOVE ? -1 : 1)
 
 // ### Lookup
 
@@ -63,8 +63,21 @@ function* merge (fn, xs, ys, cmpD = cmp, cmpV = cmp) {
       xy = v
     }
   }
-  
   yield xy
+}
+
+// ### Convert to spans { start, value, end }
+
+function* spans (store) {
+  const r = [], l = store.length-1
+  let start = [-Infinity]
+  for (let i=0; i<l; i+=2) {
+    const end = store[i+1]
+    yield { start, value:store[i], end }
+    start = end
+  }
+  if (l >= 0)
+    yield { start, value:store[l], end:[Infinity] }
 }
 
 
@@ -117,7 +130,9 @@ function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = R
   return class RangeMap {
 
     constructor (store) {
-      this.store = Array.from (store)
+      Object.defineProperties (this, {
+        store: { value: Array.from (store), enumerable:false }
+      })
     }
 
     static byMapping (fn, list) {
@@ -141,8 +156,8 @@ function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = R
       return this._toString () .join ('')
     }
 
-    toArray (fn = x => x) {
-      return this.store // Array.from (this.iterate (fn))
+    *ranges () {
+      yield* spans (this.store)
     }
 
     _toString () {
@@ -155,18 +170,17 @@ function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = R
       return r // this.store // Array.from (this.iterate (([d,k]) => d === BELOW ? '|'+k : k+'|'))
     }
 
-    _log () {
-      console.log (String (this))
-      return this
-    }
   }
 }
 
 
 // RangeSet API
 // ------------
-// Range Sets are range lists with boolean output labels
+// Range Sets are range maps with boolean output labels
 // This is nice because they now are a boolean algebra.
+
+const compareBoolean = (a, b) =>
+  !a ? !b ? 0 : -1 : b ? 0 : 1
 
 RangeSet.above = a => [ABOVE, a]
 RangeSet.below = a => [BELOW, a]
@@ -174,7 +188,7 @@ RangeSet.below = a => [BELOW, a]
 function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.above } = { }) {
   if (typeof compareElement !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareElement function.')
-  const compareBoolean = (a, b) => !a ? !b ? 0 : -1 : b ? 0 : 1
+
   class RangeSet extends RangeMap (compareElement, compareBoolean) {
 
     get full () {
@@ -199,7 +213,7 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
       return new RangeSet ([true, below (k), false])
     }
     
-    static uptoabove (k) {
+    static uptoAbove (k) {
       return new RangeSet ([true, above (k), false])
     }
     
@@ -207,7 +221,7 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
       return new RangeSet ([false, below (k), true])
     }
     
-    static fromabove (k) {
+    static fromAbove (k) {
       return new RangeSet ([false, above (k), true])
     }
     
@@ -227,6 +241,11 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
       return this.byMapping (a => !a, set1)
     }
     
+    *ranges () {
+      for (const { start, end, value } of spans (this.store))
+        if (value) yield { start, end }
+    }
+
     negate () {
       return RangeSet.not (this)
     }
@@ -236,5 +255,9 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
   RangeSet.prototype.test = RangeSet.prototype.lookup
   return RangeSet
 }
+
+
+// Exports
+// -------
 
 module.exports = { RangeMap, RangeSet }

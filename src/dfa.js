@@ -56,7 +56,7 @@ function OneLevel (Terms = new Normalised ()) {
 
     *[Symbol.iterator] () {
       const { id, term, accepts, derivs } = this
-      yield* [id, print (term), accepts, ... RangeMap (compareChar, cmpJs). byMapping (print, derivs) .toArray () ]
+      yield* [id, print (term), accepts, ... RangeMap (compareChar, cmpJs). byMapping (print, derivs) .store ]
     }
 
     toString () {
