@@ -135,12 +135,12 @@ function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = R
       })
     }
 
-    static byMapping (fn, list) {
+    static mapped (fn, list) {
       // FIXME need to handle above/ below normalisations
       return new this (merge (fn, list.store, [null], compareD, compareValue))
     }
 
-    static byMerging (fn, list1, list2) {
+    static merged (fn, list1, list2) {
       return new this (merge (fn, list1.store, list2.store, compareD, compareValue, { below, above }))
     }
 
@@ -191,7 +191,7 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
 
   class RangeSet extends RangeMap (compareElement, compareBoolean) {
 
-    get full () {
+    static get full () {
       return new RangeSet ([true])
     }
 
@@ -226,19 +226,19 @@ function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.ab
     }
     
     static and (set1, set2) {
-      return this.byMerging ((a,b) => a && b, set1, set2)
+      return this.merged ((a,b) => a && b, set1, set2)
     }
 
     static or (set1, set2) {
-      return this.byMerging ((a,b) => a || b, set1, set2)
+      return this.merged ((a,b) => a || b, set1, set2)
     }
 
     static diff (set1, set2) {
-      return this.byMerging ((a,b) => a !== b, set1, set2)
+      return this.merged ((a,b) => a !== b, set1, set2)
     }
 
     static not (set1) {
-      return this.byMapping (a => !a, set1)
+      return this.mapped (a => !a, set1)
     }
     
     *ranges () {

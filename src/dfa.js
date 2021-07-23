@@ -56,7 +56,7 @@ function OneLevel (Terms = new Normalised ()) {
 
     *[Symbol.iterator] () {
       const { id, term, accepts, derivs } = this
-      yield* [id, print (term), accepts, ... RangeMap (compareChar, cmpJs). byMapping (print, derivs) .store ]
+      yield* [id, print (term), accepts, ... RangeMap (compareChar, cmpJs). mapped (print, derivs) .store ]
     }
 
     toString () {
@@ -65,7 +65,7 @@ function OneLevel (Terms = new Normalised ()) {
         term,
         print (term),
         accepts,
-        `[ ${ RangeMap (compareChar, cmpJs).byMapping (print, derivs) } ]`
+        `[ ${ RangeMap (compareChar, cmpJs).mapped (print, derivs) } ]`
         //derivs.toString ()
       ] .join (' ')
     }
@@ -94,7 +94,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.step (char),
       Accepts.step (char),
-      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (char))
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (char))
     )
   }
 
@@ -102,7 +102,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.range (char1, char2),
       Accepts.range (char1, char2),
-      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (char1, char2))
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (char1, char2))
     )
   }
 
@@ -110,19 +110,19 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.not (term),
       Accepts.not (accepts),
-      Derivs.byMapping (Terms.not, derivs)
+      Derivs.mapped (Terms.not, derivs)
     )
   }
 
   repeat ({ term, accepts, derivs }, least, most) {
     //log ('repeat', term, derivs.toString(), least, most)
-    //log ('repeatTerm',  Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs).toString())
+    //log ('repeatTerm',  Derivs.mapped (dr => Terms.conc (dr, repeatTerm), derivs).toString())
     const newTerm = Terms.repeat (term, least, most) // NB calling this first; keep the heap ordered
     const repeatTerm = Terms.repeat (term, Math.max (least-1, 0), Math.max (most-1, 0))
     return new State (
       newTerm,
       Accepts.repeat (accepts, least, most),
-      Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs)
+      Derivs.mapped (dr => Terms.conc (dr, repeatTerm), derivs)
       // ∂r<l,m> = ∂r<max(l-1, 0), m-1>
     )
   }
@@ -135,7 +135,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.or (left.term, right.term),
       Accepts.or (left.accepts, right.accepts), 
-      Derivs.byMerging (Terms.or, left.derivs, right.derivs)
+      Derivs.merged (Terms.or, left.derivs, right.derivs)
     )
   }
 
@@ -147,7 +147,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.and (left.term, right.term),
       Accepts.and (left.accepts, right.accepts), 
-      Derivs.byMerging (Terms.and, left.derivs, right.derivs)
+      Derivs.merged (Terms.and, left.derivs, right.derivs)
     )
   }
 
@@ -158,11 +158,11 @@ function OneLevel (Terms = new Normalised ()) {
   conc2 (head, tail) {
     //log ('calling conc', head, tail)
     const newTerm = Terms.conc (head.term, tail.term)
-    const left = Derivs.byMapping (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
+    const left = Derivs.mapped (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
     return new State (
       newTerm,
       Accepts.conc (head.accepts, tail.accepts), 
-      !head.accepts ? left : Derivs.byMerging (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
+      !head.accepts ? left : Derivs.merged (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
     )
   }
 
