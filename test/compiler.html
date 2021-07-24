@@ -1,0 +1,111 @@
+
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style/base.css">
+  <link rel="stylesheet" href="style/main.css">
+  <script src="../dist/ab-regex.min.js"></script>
+  <script src="scripts/layout.js"></script>
+</head>
+
+<body class="serif p2" >
+
+  <div class="br2 c" style=width:24rem >
+    <h1>Regular Expression Compiler</h1>
+    <p style=font-size:1.8rem;line-height:1.5rem>🦋</p>
+    <p >
+      This is a test page for my Regular Expression Engine 
+      (<a href=https://github.com/alwinb/ab-regex>GitHub</a>). 
+      You can use it to convert a regular expression to a transition table, 
+      to be revealed underneath the input box. <br>
+    </p>
+    <p>
+      The rows correspond to the states of a DFA
+      (<a href=https://en.wikipedia.org/wiki/Deterministic_finite_automaton>Wikipedia</a>). 
+      The columns that are labeled with character ranges, correspond to outgoing edges. 
+      The row with a teal id-cell, is the &lsquo;current state&rsquo;.
+      This is the start state of the DFA.
+    </p>
+    <p>
+      The dimmed cells refer to state 0, which corresponds to the ⊥-expression. 
+      It does not match any string at all. 
+      The state with id 1 corresponds to the ⊤-expression. It matches all strings. 
+      The state with id 2 corresponds to the ε-expression, It matches only the empty string,
+      and state-3 matches any string of length 1. 
+  </div>
+
+
+  <div id=compiler>
+
+    <form>
+      <input class=mono id=regex>
+      <button>Compile</button>
+    </form>
+
+    <div id=output class=sans>
+    </div>
+
+  </div>
+
+
+<script>
+
+  const leafs = new Set (['td', 'th', 'span', 'del', 'ins', 'input', 'a'])
+  const doc = document
+  const elem = (...args) => (subs) => {
+    let tag = String.raw (...args)
+    let el = document.createElement (tag)
+    if (leafs.has (tag)) el.append (subs)
+    else if (subs) el.append (...subs)
+    return el
+  }
+
+  let pre, button
+  let form = doc.forms[0]
+  let input = doc.getElementById ('regex')
+  let output = doc.getElementById ('output')
+
+  form.addEventListener ('submit', evt => {
+    evt.preventDefault ()
+    input.blur ()
+    show (input.value)
+  })
+  
+  function show (str) {
+    try {
+      let r = new Regex (String (str))
+
+      const tab = makeTable (r.store._states)
+
+      const thead = elem `tr` (tab.head.map (_ => {
+        let th = elem `th` (_.start === _.end ? _.start : `${_.start} – ${_.end}`)
+        return (th.classList.add ('nowrap'), th)
+      }))
+      thead.insertBefore (elem `th` ('accepts'), thead.firstChild)
+      thead.insertBefore (elem `th` ('id'), thead.firstChild)
+      
+      let rows = tab.rows.map (row => {
+        let { id, term, accepts, derivs } = row
+        // console.log (derivs)
+        const nums = derivs.map (_ => {
+          const td = elem `td` (_.value)
+          if (_.value === 0) td.classList.add ('dim')
+          return td
+        })
+        return elem `tr` ([elem `th` (id), elem `th` (accepts), ...nums])
+      })
+      rows [r.state] .classList.add ('selected')
+
+      let table = elem `table` ()
+      table.classList.add ('lines')
+      table.append (thead, elem `tbody` (rows))
+
+      output.innerHTML = null
+      output.append (table)
+    }
+    catch (e) { throw e }
+  }
+
+  input.value = '[a-zA-Z_] [a-zA-Z0-9]+ | [1-9][0-9]+'
+  show (input.value)
+
+</script>
