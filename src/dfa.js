@@ -48,6 +48,7 @@ const Accepts = {
 const first = ({term}) => term
 const second = ({accepts}) => accepts
 const third = ({derivs}) => derivs
+const cp = (str) => str.codePointAt (0)
 
 function OneLevel (Terms = new Normalised ()) {
 
@@ -102,7 +103,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.step (char),
       Accepts.step (char),
-      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (char))
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (cp(char)))
     )
   }
 
@@ -110,7 +111,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.range (char1, char2),
       Accepts.range (char1, char2),
-      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (char1, char2))
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (cp(char1), cp(char2)))
     )
   }
 
@@ -230,10 +231,12 @@ function Compiler () {
   this.run = function (id, string = '') {
     //log ('run\n', id, states[id], '=>')
     for (let char of string) {
+      const cp = char.codePointAt (0)
+      // log ({cp})
       if (id === Derivs.bottom.id) return states[id]
       if (id === Derivs.top.id) return states[id]
-      id = states[id].derivs.lookup (char)
-      //log (char, '===>', id, states[id].accepts)
+      id = states[id].derivs.lookup (cp)
+      // log (String.fromCodePoint(cp), '===>', id, states[id].accepts)
     }
     return states [id]
   }
