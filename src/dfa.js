@@ -186,14 +186,14 @@ function OneLevel (Terms = new Normalised ()) {
 // These are iterativbely unfolded as well, until no new terms appear.
 
 function Compiler () {
-  const Derivs = new OneLevel ()
-  const heap = Derivs._heap
+  const Unfolded = new OneLevel ()
+  const heap = Unfolded._heap
   const states = []
   this.apply = apply.bind (this)
   this._states = states
 
   for (let x of heap)
-    states.push (Derivs.apply (...x))
+    states.push (Unfolded.apply (...x))
 
   this._inspect = function* () {
     for (let s of states)
@@ -208,14 +208,14 @@ function Compiler () {
   function apply (...fx) {
     try {
       let i = states.length-1
-      const d = Derivs.apply (...fx)
+      const d = Unfolded.apply (...fx)
       states[d.id] = d
       //log ('compile started at', i, 'created', d.id)
       //log (states.map (x => x == null ? null : x.id))
       for (; i<heap.length; i++) if (!states[i]) {
           let dop = Algebra.fmap (y => states[y]) (heap[i])
           //log ('missing state', i, dop)
-          let d = Derivs.apply (...dop)
+          let d = Unfolded.apply (...dop)
           //log ('created', d)
           states[d.id] = d
       }
@@ -234,8 +234,8 @@ function Compiler () {
     for (let char of string) {
       const cp = char.codePointAt (0)
       // log ({cp})
-      if (id === Derivs.bottom.id) return states[id]
-      if (id === Derivs.top.id) return states[id]
+      if (id === Unfolded.bottom.id) return states[id]
+      if (id === Unfolded.top.id) return states[id]
       id = states[id].derivs.lookup (cp)
       // log (String.fromCodePoint(cp), '===>', id, states[id].accepts)
     }
