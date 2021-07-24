@@ -190,6 +190,7 @@ function Compiler () {
   const heap = Derivs._heap
   const states = []
   this.apply = apply.bind (this)
+  this._states = states
 
   for (let x of heap)
     states.push (Derivs.apply (...x))
@@ -243,4 +244,4 @@ function Compiler () {
 
 }
 
-module.exports = { OneLevel, Compiler, Normalised }
+module.exports = { OneLevel, Compiler, Normalised, CharSet }

@@ -1,3 +1,1 @@
-const { Regex, TokenSet } = require ('./')
-window.Regex = Regex
-window.TokenSet = TokenSet
+Object.assign (window, require ('./'))

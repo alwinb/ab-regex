@@ -1,5 +1,6 @@
 const { parse } = require ('../src/grammar')
-const { TermStore, Compiler } = require ('./dfa')
+const { TermStore, Compiler, CharSet } = require ('./dfa')
+const { RangeMap, RangeSet } =require ('./rangemap')
 const TS = require ('./tokenset')
 
 // Regex Top Level API
@@ -11,7 +12,7 @@ class Regex {
     const { store = new Compiler (), fromString = '' } = arg
     const delta = parse (String (fromString), store.apply.bind (store))
     Object.defineProperties (this, {
-      _store: { value:store },
+      store: { value:store },
       state: { value:delta.id },
       accepts: { value:delta.accepts },
       source: { value:fromString, enumerable:true }
@@ -19,7 +20,7 @@ class Regex {
   }
 
   test (input) {
-    return this._store.run (this.state, input) .accepts
+    return this.store.run (this.state, input) .accepts
   }
 
   createReducer () {
@@ -38,7 +39,7 @@ class Reducer {
   }
 
   write (input) {
-    const r = this._regex._store.run (this.state, input)
+    const r = this._regex.store.run (this.state, input)
     this.state = r.id
     this.accepts = r.accepts
     return this
@@ -64,4 +65,7 @@ class TokenSet {
 
 }
 
-module.exports = { Regex, TokenSet }
+// Exports
+// -------
+
+module.exports = { Regex, TokenSet, RangeMap, RangeSet, CharSet, _private:TS }
