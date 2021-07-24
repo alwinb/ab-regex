@@ -90,10 +90,10 @@ function Shared () {
 // Normalised term store
 // =====================
 
-// SemiLattice implementation for flattening nested ORs
-// Implemented for nonempty ordered arrays. 
+// OrdList SemiLattice
+// used for flattening nested ORs
 
-function SemiLattice (compareElement) {
+function OrdList (compareElement = cmpJs) {
 
   return { join: (as, bs) => [...zip (as, bs)] }
 
@@ -101,7 +101,7 @@ function SemiLattice (compareElement) {
     //log (as, bs)
     as = as [Symbol.iterator] ()
     bs = bs [Symbol.iterator] ()
-    let [a, b] = [as.next(), bs.next()]
+    let a = as.next (), b = bs.next ()
     while (!(a.done && b.done)) {
       if (a.done) { yield b.value; yield* bs; return }
       if (b.done) { yield a.value; yield* as; return }
@@ -113,7 +113,7 @@ function SemiLattice (compareElement) {
   }
 }
 
-// log (SemiLattice (cmpJs) .join ("acejhs", "abcdegjs") .join (''))
+// log (OrdList (cmpJs) .join ("acejhs", "abcdegjs") .join (''))
 
 // 'Squash' Semigroup for flattening nested CONCs;
 // Implemented as concatenation of nonempty lists, possibly squashing
@@ -132,7 +132,6 @@ function SquashSemiGroup (squash) {
   }
 
 }
-// log ([... zip (cmpJs)([5], [6])])
 
 // Finally, the Normalised term store. 
 // This implements the regex signature,
@@ -143,7 +142,7 @@ function Normalised (Store = new Shared ()) {
 
 const { top, bottom, empty, any } = Store
 const ordTimes = (a,b) => a && b && a * b // 'Ordinal multiplication'
-const OrSemiLattice = SemiLattice (cmpJs)
+const Ors = OrdList (cmpJs)
 
 return new (class Normalised {
 
@@ -224,7 +223,6 @@ return new (class Normalised {
   }
 
   or2 (a1, a2) {
-    // FIXME new parser emits n-ary or
     const repeat = this.repeat.bind (this)
     if (a1 === top) return top          // ⊤ | r = ⊤
     if (a2 === top) return top          // r | ⊤ = ⊤
@@ -243,7 +241,7 @@ return new (class Normalised {
 
     //log ('expand', expand (a1), expand (a2))
 
-    const disjuncts = OrSemiLattice.join (expand (a1), expand (a2))
+    const disjuncts = Ors.join (expand (a1), expand (a2))
 
     //log ('or disjuncts', disjuncts)
 

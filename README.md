@@ -30,7 +30,7 @@ The main concept is that of a regular expression algebra. This is modeled in jav
 Concepts and Data structures:
 
 - Signature
-- RangeList
+- RangeMap
 - State
 
 Regular expression Algebras:

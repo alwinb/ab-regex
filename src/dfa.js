@@ -2,7 +2,20 @@ const log = console.log.bind (console)
 const json = x => JSON.stringify (x, null, 2)
 const { Algebra } = require ('./signature')
 const { Normalised, _print } = require ('./normalize')
-const { RangeList, RangeSet } = require ('./rangelist')
+const { RangeMap, RangeSet } = require ('./rangemap')
+
+// CharSets
+// --------
+
+const cmpJs = (t1, t2) =>
+  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
+
+const above = cp =>
+  RangeSet.below (cp + 1)
+
+const CharMap = RangeMap (cmpJs, cmpJs, { above })
+const CharSet = RangeSet (cmpJs, { above })
+
 
 // One Level Unfoldings
 // --------------------
@@ -28,22 +41,18 @@ const Accepts = {
 // 'OneLevel' is a regular expression algebra that has as a carrier
 // the set of one-level unfoldings. Thus, it is the algebra that implements
 // the regular expression coalgebra. Yes that sounds confusing :)
-// A one-level unfolding, is a State object, consisting of a normalised term as id,
-// a boolen indicating if this is an accepting state, and a RangeList, from
-// chars to normalised derivative terms. 
+// A one-level unfolding, is a State { term, accepts, derivs } object,
+// consisting of a normalised term as an id, an'accepts' boolean, and
+// a RangeMap, from chars to normalised derivative regexp terms. 
 
 const first = ({term}) => term
 const second = ({accepts}) => accepts
 const third = ({derivs}) => derivs
-
-const cmpJs = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-const compareChar = cmpJs
-const CharSet = RangeSet (compareChar)
-
+const cp = (str) => str.codePointAt (0)
 
 function OneLevel (Terms = new Normalised ()) {
 
-  const Derivs = RangeList (compareChar, Terms.compare)
+  const Derivs = RangeMap (cmpJs, Terms.compare)
   const print = x => _print (Terms.out, x)
 
   class State {
@@ -51,12 +60,12 @@ function OneLevel (Terms = new Normalised ()) {
       this.id = term
       this.term = term
       this.accepts = accepts
-      this.derivs = derivs   // a RangeList of successor states
+      this.derivs = derivs   // a RangeMap of successor states
     }
 
     *[Symbol.iterator] () {
       const { id, term, accepts, derivs } = this
-      yield* [id, print (term), accepts, ... RangeList (compareChar, cmpJs). byMapping (print, derivs) .toArray () ]
+      yield* [id, print (term), accepts, ... Derivs.mapped (print, derivs) .store ]
     }
 
     toString () {
@@ -65,7 +74,7 @@ function OneLevel (Terms = new Normalised ()) {
         term,
         print (term),
         accepts,
-        `[ ${ RangeList (compareChar, cmpJs).byMapping (print, derivs) } ]`
+        `[ ${ Derivs.mapped (print, derivs) } ]`
         //derivs.toString ()
       ] .join (' ')
     }
@@ -94,7 +103,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.step (char),
       Accepts.step (char),
-      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (char))
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (cp(char)))
     )
   }
 
@@ -102,7 +111,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.range (char1, char2),
       Accepts.range (char1, char2),
-      Derivs.byMapping (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (char1, char2))
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromRange (cp(char1), cp(char2)))
     )
   }
 
@@ -110,19 +119,19 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.not (term),
       Accepts.not (accepts),
-      Derivs.byMapping (Terms.not, derivs)
+      Derivs.mapped (Terms.not, derivs)
     )
   }
 
   repeat ({ term, accepts, derivs }, least, most) {
     //log ('repeat', term, derivs.toString(), least, most)
-    //log ('repeatTerm',  Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs).toString())
+    //log ('repeatTerm',  Derivs.mapped (dr => Terms.conc (dr, repeatTerm), derivs).toString())
     const newTerm = Terms.repeat (term, least, most) // NB calling this first; keep the heap ordered
     const repeatTerm = Terms.repeat (term, Math.max (least-1, 0), Math.max (most-1, 0))
     return new State (
       newTerm,
       Accepts.repeat (accepts, least, most),
-      Derivs.byMapping (dr => Terms.conc (dr, repeatTerm), derivs)
+      Derivs.mapped (dr => Terms.conc (dr, repeatTerm), derivs)
       // ∂r<l,m> = ∂r<max(l-1, 0), m-1>
     )
   }
@@ -135,7 +144,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.or (left.term, right.term),
       Accepts.or (left.accepts, right.accepts), 
-      Derivs.byMerging (Terms.or, left.derivs, right.derivs)
+      Derivs.merged (Terms.or, left.derivs, right.derivs)
     )
   }
 
@@ -147,7 +156,7 @@ function OneLevel (Terms = new Normalised ()) {
     return new State (
       Terms.and (left.term, right.term),
       Accepts.and (left.accepts, right.accepts), 
-      Derivs.byMerging (Terms.and, left.derivs, right.derivs)
+      Derivs.merged (Terms.and, left.derivs, right.derivs)
     )
   }
 
@@ -158,11 +167,11 @@ function OneLevel (Terms = new Normalised ()) {
   conc2 (head, tail) {
     //log ('calling conc', head, tail)
     const newTerm = Terms.conc (head.term, tail.term)
-    const left = Derivs.byMapping (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
+    const left = Derivs.mapped (dr => Terms.conc (dr, tail.term), head.derivs) // left = (∂r)s
     return new State (
       newTerm,
       Accepts.conc (head.accepts, tail.accepts), 
-      !head.accepts ? left : Derivs.byMerging (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
+      !head.accepts ? left : Derivs.merged (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
     )
   }
 
@@ -172,9 +181,9 @@ function OneLevel (Terms = new Normalised ()) {
 // Compiler
 // ========
 // The compiler wraps around the OneLevel, and Normalised (Term) algebras
-// When a one-level unfolding is computed, the derivative terms that are generated
-// in the process are stored in the Normalised store. These are then iteratively unfolded
-// as well, until no new terms appear. 
+// When a one-level unfolding is computed, any new derivative terms that are
+// generated in the process are stored in the Normalised store as well.
+// These are iterativbely unfolded as well, until no new terms appear.
 
 function Compiler () {
   const Derivs = new OneLevel ()
@@ -222,10 +231,12 @@ function Compiler () {
   this.run = function (id, string = '') {
     //log ('run\n', id, states[id], '=>')
     for (let char of string) {
+      const cp = char.codePointAt (0)
+      // log ({cp})
       if (id === Derivs.bottom.id) return states[id]
       if (id === Derivs.top.id) return states[id]
-      id = states[id].derivs.lookup (char)
-      //log (char, '===>', id, states[id].accepts)
+      id = states[id].derivs.lookup (cp)
+      // log (String.fromCodePoint(cp), '===>', id, states[id].accepts)
     }
     return states [id]
   }
