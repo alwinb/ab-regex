@@ -1,105 +1,56 @@
-<meta charset="utf-8">
-<script src="../dist/ab-regex.min.js"></script>
-<style>
 
-  /* Styles for debugging */
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style/base.css">
+  <link rel="stylesheet" href="style/main.css">
+  <script src="../dist/ab-regex.min.js"></script>
+  <script src="scripts/layout.js"></script>
+</head>
 
-  html.debug * {
-    outline:1px solid #0004;
-    opacity:.9;
-  }
+<body class="serif p2" >
 
-  html.debug {
-    /* show the 1rem baseline rhythm */
-    background:repeating-linear-gradient(to bottom, #0000, #0000 calc(1rem - 1px), #ccc calc(1rem - 1px), #ccc 1rem, #0000 1rem);
-  }
+  <div class="br2 c" style=width:24rem >
+    <h1>Regular Expression Compiler</h1>
+    <p style=font-size:1.8rem;line-height:1.5rem>🦋</p>
+    <p >
+      This is a test page for my Regular Expression Engine 
+      (<a href=https://github.com/alwinb/ab-regex>GitHub</a>). 
+      You can use it to convert a regular expression to a transition table, 
+      to be revealed underneath the input box. <br>
+    </p>
+    <p>
+      The rows correspond to the states of a DFA
+      (<a href=https://en.wikipedia.org/wiki/Deterministic_finite_automaton>Wikipedia</a>). 
+      The columns that are labeled with character ranges, correspond to outgoing edges. 
+      The row with a teal id-cell, is the &lsquo;current state&rsquo;.
+      This is the start state of the DFA.
+    </p>
+    <p>
+      The dimmed cells refer to state 0, which corresponds to the ⊥-expression. 
+      It does not match any string at all. 
+      The state with id 1 corresponds to the ⊤-expression. It matches all strings. 
+      The state with id 2 corresponds to the ε-expression, It matches only the empty string,
+      and state-3 matches any string of length 1. 
+  </div>
 
 
-  /* Establish a vertial rhythm by using
-    one rem unit as a global line-height unit */
+  <div id=compiler>
 
-  :root, body { 
-    font-size:32px;
-    margin:0;
-    padding:0;
-  }
+    <form>
+      <input class=mono id=regex>
+      <button>Compile</button>
+    </form>
 
-  * {
-    line-height:1rem;
-    box-sizing:border-box;
-  }
-  
-  body :not(h1,h2,h3,h4,h5,h6) {
-    font-size:inherit;
-  }
+    <div id=output class=sans>
+    </div>
 
-  /* Block elements followed by a blank line */
-  hr,p,ol,ul,dl,table,form,blockquote,pre,figure,img,video,canvas,h1,h2 {
-    display:block;
-    margin-top:0;
-    margin-bottom:1rem;
-  }
+  </div>
 
-  /* No extra line after :last-child */
-  hr:last-child,p:last-child,ol:last-child,ul:last-child,dl:last-child,table:last-child,form:last-child,
-  blockquote:last-child,pre:last-child,figure:last-child,img:last-child,video:last-child,canvas:last-child,
-  h1:last-child,h2:last-child {
-    margin-bottom:0;
-  }
 
-  /* Block elements without extra line */
-  header,main,aside,article,footer,nav,div,dd,dt,fieldset,legend,figcaption,h3,h4,h5,h6,label {
-    display:block;
-    margin-top:0;
-    margin-bottom:0;
-  }
-
-  /** End of the vr **/
-  /* Table and horizontal rule */
-  table {
-  	border-spacing:0;
-    border-collapse:collapse;
-    border:1px solid currentColor;
-  }
-
-  hr {
-    border:1px solid currentColor;
-    margin:-1px 0 -1px 0;
-  }
-
-  /***/
-  body { font-size:18px; margin:3rem 1rem 1rem;}
-  td, th{
-    padding:0 1em;
-    border:1px solid currentColor;
-  }
-  .selected {
-    background:teal;
-    color:white;
-  }
-
-  input {
-    width:calc(100% - 5em);
-    padding:0 .3em;
-  }
-  button {
-    width:5em;
-  }
-
-</style>
-<body>
-<h1>Regular Expression Compiler</h1>
-<form>
-  <input id=regex><button>Compile</button>
-</form>
-<div id=table>
-</div>
-
-<script>"use strict"
+<script>
 
   const leafs = new Set (['td', 'th', 'span', 'del', 'ins', 'input', 'a'])
   const doc = document
-  const log = console.log.bind (console)
   const elem = (...args) => (subs) => {
     let tag = String.raw (...args)
     let el = document.createElement (tag)
@@ -111,7 +62,7 @@
   let pre, button
   let form = doc.forms[0]
   let input = doc.getElementById ('regex')
-  let output = doc.getElementById ('table')
+  let output = doc.getElementById ('output')
 
   form.addEventListener ('submit', evt => {
     evt.preventDefault ()
@@ -122,27 +73,39 @@
   function show (str) {
     try {
       let r = new Regex (String (str))
-      let rows = [...r._store].map (row => {
+
+      const tab = makeTable (r.store._states)
+
+      const thead = elem `tr` (tab.head.map (_ => {
+        let th = elem `th` (_.start === _.end ? _.start : `${_.start} – ${_.end}`)
+        return (th.classList.add ('nowrap'), th)
+      }))
+      thead.insertBefore (elem `th` ('accepts'), thead.firstChild)
+      thead.insertBefore (elem `th` ('id'), thead.firstChild)
+      
+      let rows = tab.rows.map (row => {
         let { id, term, accepts, derivs } = row
-        return elem `tr` ([id, accepts, elem `code` (derivs.toString())].map (elem `td`))
+        // console.log (derivs)
+        const nums = derivs.map (_ => {
+          const td = elem `td` (_.value)
+          if (_.value === 0) td.classList.add ('dim')
+          return td
         })
-      rows [r.state].classList.add ('selected')
+        return elem `tr` ([elem `th` (id), elem `th` (accepts), ...nums])
+      })
+      rows [r.state] .classList.add ('selected')
 
       let table = elem `table` ()
-      table.append (...['state', 'accepts', 'successors'].map (elem `th`))
-      table.append (...rows)
+      table.classList.add ('lines')
+      table.append (thead, elem `tbody` (rows))
+
       output.innerHTML = null
       output.append (table)
     }
-    catch (e) {
-      throw e
-    }
+    catch (e) { throw e }
   }
-  
 
-  input.value = 'a|b|c*'
-  show ('a|b|c*')
-
-
+  input.value = '[a-zA-Z_] [a-zA-Z0-9]+ | [1-9][0-9]+'
+  show (input.value)
 
 </script>

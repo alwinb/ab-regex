@@ -1,0 +1,80 @@
+
+.c {
+  text-align:center;
+}
+
+html { font-size:25px; }
+body { 
+  font-size:18px; 
+  margin-left:2rem;
+  overflow-x:hidden;
+}
+a { color:teal; }
+
+h1 {
+  font-size:1.7rem;
+}
+
+.selected th:first-child {
+  background:teal;
+  color:white;
+  border-color:black;
+}
+
+form {
+  position:relative;
+}
+
+input {
+  width:100%;
+  line-height:1.5rem;
+  border:1px solid #999;
+  padding:0 calc(4rem + .44em) 0 .44em;
+  background:#fafafa;
+  border-radius:4px;
+}
+
+button {
+  position:absolute;
+  right:0;
+  background:teal;
+  color:white;
+  line-height:1.5rem;
+  width:4rem;
+  border:1px solid #555;
+  padding:0 .3em;
+  border-radius:0 4px 4px 0;
+}
+
+#compiler {
+  max-width:100%;
+  min-width:24rem;
+  display:inline-block;
+}
+
+#output {
+  overflow:scroll;
+  background:#eee;
+  border-radius:4px;
+  border:1px solid #999;
+}
+
+table {
+  line-height:1.1rem;
+  font-size:.5rem;
+}
+
+th, td {
+  text-align:center;
+  background:white;
+}
+
+th {
+  background:white;
+}
+
+td.dim {
+  color:#ccc;
+  background:#eee;
+}
+
