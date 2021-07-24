@@ -31,13 +31,14 @@ const Regex = {
     , bottom: atom `[⊥]`
     , empty:  atom `[ε]`
     , step:   atom `[a-zA-Z0-9]`
-    //, string: [LEAF, `["]`,     'Chars',  `["]`] // wrapfix-atom
-    , range:  atom `\[[^\]]-[^\]]]`
+    , string: [LEAF, `["]`,     'Chars',  `["]`] // wrapfix-atom
+    , range:  [LEAF, `[[]`,     'RangeSet',  `]` ] // wrapfix-atom
+    // , range:  atom `\[[^\]]-[^\]]]`
     , group:  [LEAF, `[(]`,     'Regex',   `[)]`] }, // wrapfix-atom
 
     { and:    assoc  `[&]`  },
     { or:     assoc  `[|]`  },
-    { conc:   assoc  `.{0}(?=[!a-zA-Z0-9.[(⊤⊥ε\t\f\x20\n])` },
+    { conc:   assoc  `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε\t\f\x20\n])` },
     { not:    prefix `[!]`  },
 
     { star:   postfix `[*]`
@@ -51,7 +52,7 @@ const Chars = {
   name: 'Chars',
   end: end `["]`,
   sig: [
-    { chars:  atom `[^\x00-\x19\\"]+`
+    { chars:  atom `[^\x00-\x19\\"]` // +
     , esc:    atom `[\\]["/\\bfnrt]`
     , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
     , empty:  atom `.{0}(?=")` },
@@ -60,11 +61,25 @@ const Chars = {
 }
 
 
+const RangeSet = {
+  name: 'RangeSet',
+  end: end `]`,
+  sig: [
+    { range:  atom `[^\x00-\x19\]]-[^\x00-\x19\]]`
+    , char:   atom `[^\x00-\x19\]]`
+    // , esc:    atom `[\\]["/\\bfnrt]`
+    // , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
+    , empty:  atom `.{0}(?=\])` },
+    { rnor: assoc `.{0}(?!\])` }
+  ]
+}
+
+
 // Compile the grammar
 // -------------------
 
 const { lexers, types } =
-  hoop.compile ({ Regex, Chars })
+  hoop.compile ({ Regex, Chars, RangeSet })
 
 // Collecting the names for the node types
 
@@ -116,17 +131,23 @@ function preEval (...args) {
   const r
     = tag === T.Regex.group  ? ['group', x1]
     : tag === T.Regex.step   ? ['step',  data]
-    : tag === T.Regex.range  ? ['range', data[1], data[3]]
+    : tag === T.Regex.range  ? ['group', x1] //['range', data[1], data[3]]
     : tag === T.Regex.repeat ? parseRepeat (data, x1)
     : tag === T.Regex.star   ? ['repeat', x1, 0, Infinity]
     : tag === T.Regex.plus   ? ['repeat', x1, 1, Infinity]
     : tag === T.Regex.opt    ? ['repeat', x1, 0, 1]
+    : tag === T.Regex.string ? ['group', x1] // Quickly added; REVIEW
 
-    // : tag === T.Chars.empty ? ''
-    // : tag === T.Chars.chars ? data
-    // : tag === T.Chars.esc ? _escapes [data[1]] || data[1]
-    // : tag === T.Chars.hexesc ? String.fromCodePoint (parseInt (data.substr(2), 16))
-    // : tag === T.Chars.conc ? x1 + x2
+    : tag === T.Chars.empty  ? ['empty']
+    : tag === T.Chars.chars  ? ['step', data]
+    : tag === T.Chars.esc    ? ['step', _escapes [data[1]] || data[1]]
+    : tag === T.Chars.hexesc ? ['step', String.fromCodePoint (parseInt (data.substr(2), 16))]
+    : tag === T.Chars.strcat ? ['conc', ...args.slice (1)]
+
+    : tag === T.RangeSet.empty ? ['empty']
+    : tag === T.RangeSet.range ? ['range', data[0], data[2]]
+    : tag === T.RangeSet.char  ? ['step', data]
+    : tag === T.RangeSet.rnor  ? ['or', ...args.slice (1)]
 
     : args
   // log ('==>', {r})
@@ -141,6 +162,7 @@ function parseRepeat (data, arg) {
 }
 
 
+// log (typeNames)
 
 module.exports = { parse }
 

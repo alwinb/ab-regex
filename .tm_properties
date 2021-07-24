@@ -19,6 +19,9 @@ TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/normalize.test.js"
 [src/dfa.js]
 TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/dfa.test.js"
 
+[src/tokenset.js]
+TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/tokenset.test.js"
+
 [src/index.js]
 TM_RUN_TARGET = "${TM_PROJECT_DIRECTORY}/test/index.test.js"
 
