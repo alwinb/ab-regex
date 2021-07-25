@@ -1,5 +1,5 @@
 const hoop = require ('../lib/hoop2')
-const { signature:S, operators:T, lexers } = require ('./signature.js')
+const { sorts:S, operators:T, lexers } = require ('./signature.js')
 const log = console.log.bind (console)
 
 

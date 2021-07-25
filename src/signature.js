@@ -1,6 +1,6 @@
 const hoop = require ('../lib/hoop2')
-const { opInfo, token, tokenType, start, atom, prefix, infix, postfix, assoc, end } = hoop
-const { LEAF, PREFIX, INFIX, POSTFIX } = hoop.Roles
+const { opInfo, token, tokenType, start, atom, konst, prefix, infix, postfix, assoc, end } = hoop
+const { LEAF, CONST, PREFIX, INFIX, POSTFIX } = hoop.Roles
 const { raw } = String
 const log = console.log.bind (console)
 
@@ -24,10 +24,10 @@ const Regex = {
   skip: skips,
   end: end `[)]`,
   sig: [
-    { any:    atom `[.]`
-    , top:    atom `[⊤]`
-    , bottom: atom `[⊥]`
-    , empty:  atom `[ε]`
+    { any:    konst `[.]`
+    , top:    konst `[⊤]`
+    , bottom: konst `[⊥]`
+    , empty:  konst `[ε]`
     , step:   atom `[a-zA-Z0-9]`
     , string: [LEAF, `["]`, 'Chars',   `["]` ] // wrapfix-atom
     , range:  [LEAF, `[[]`, 'RangeSet',  `]` ] // wrapfix-atom
@@ -52,7 +52,7 @@ const Chars = {
     { chars:  atom `[^\x00-\x19\\"]` // +
     , esc:    atom `[\\]["/\\bfnrt]`
     , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
-    , empty:  atom `.{0}(?=")` },
+    , empty:  konst `.{0}(?=")` },
     { strcat: assoc `.{0}(?!")` }
   ]
 }
@@ -65,7 +65,7 @@ const RangeSet = {
     , char:   atom `[^\x00-\x19\]]`
     // , esc:    atom `[\\]["/\\bfnrt]`
     // , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
-    , empty:  atom `.{0}(?=\])` },
+    , empty: konst `.{0}(?=\])` },
     { or:    assoc `.{0}(?!\])` }
   ]
 }
@@ -73,19 +73,30 @@ const RangeSet = {
 // Compile the grammar
 // -------------------
 
-const { lexers, types } =
+const { lexers, sorts } =
   hoop.compile ({ Regex, Chars, RangeSet })
 
 // Collecting the names for the node types
 
 const typeNames = {}
-const _ts = types
+const _ts = sorts
 for (const ruleName in _ts)
-  for (const typeName in _ts[ruleName])
+  for (const typeName in _ts[ruleName]) {
     typeNames[_ts[ruleName][typeName]] = typeName
     // typeNames[_ts[ruleName][typeName]] = ruleName +'.' + typeName
+    // log (ruleName, typeName, opInfo (_ts[ruleName][typeName]))
+  }
 
-const T = types.Regex
+
+// TODO right, so can we make a more generic fmap, compare, etc?
+// Soo, at the moment, part of the operator info is stored on the .. lexer
+// buit for building the fmap, we need that
+
+
+const T = sorts.Regex
+
+// log (sorts, lexers.Regex.Before.infos, lexers.Regex.After, )
+// for (let k in T) log (k, ':', opInfo (T[k]))
 
 
 // Terms
@@ -94,20 +105,13 @@ const T = types.Regex
 // A 'Node' is _one level_ of a Regex AST tree, they are
 // stored simply as arrays [operator, ...args]
 
-// for (let k in T)
-//   log (k, ':', opInfo (T[k]))
-
-
 // Signature functor, morphism part
 
 const fmap = fn => tm => {
   const [c, ...args] = tm
-  return c === T.step  ? tm
-    : c === T.any    ? tm
-    : c === T.range  ? tm
-    : c === T.empty  ? tm
-    : c === T.top    ? tm
-    : c === T.bottom ? tm
+  return c & CONST ? tm
+    : c === T.step ? tm
+    : c === T.range ? tm
     : c === T.repeat ? [c, fn (args[0]), args[1], args[2]]
     : [c, ...args.map (fn)] }
 
@@ -143,11 +147,8 @@ const Algebra = {
 
   fromObject (object) { 
     return (op, ...args) => { try {
-      return op === T.bottom ? object.bottom
-        : op === T.top    ? object.top
-        : op === T.empty  ? object.empty
-        : op === T.any    ? object.any
-        : object [typeNames[op]] (...args)
+      const name = typeNames[op]
+      return op & CONST ? object[name] : object [name] (...args)
       }
       catch (e) {
         const msg = `Error in ${object.constructor.name}.apply: ` + e.message
@@ -181,4 +182,4 @@ const Algebra = {
 }
 
 
-module.exports = { lexers, signature:types, operators:types.Regex, Algebra, fmap, compareNode }
+module.exports = { lexers, sorts, operators:sorts.Regex, Algebra, fmap, compareNode }
