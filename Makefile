@@ -3,7 +3,7 @@
 all: ab-regex
 ab-regex: dist/ab-regex.min.js
 
-srcs = aatree.js dfa.js grammar.js signature.js browser.js index.js rangemap.js normalize.js tokenset.js
+srcs = aatree.js dfa.js signature.js browser.js index.js rangemap.js normalize.js tokenset.js
 src = $(addprefix src/, $(srcs)) 
 
 dist/ab-regex.min.js: dist/ $(src) lib/hoop2.js

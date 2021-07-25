@@ -1,5 +1,5 @@
 const log = console.log.bind (console)
-const { parse } = require ('../src/grammar')
+const { parse } = require ('../src/signature')
 const { Shared, Normalised } = require ('../src/normalize')
 const { Compiler, OneLevel, _print } = require ('../src/dfa')
 const Regex = require ('../src/')

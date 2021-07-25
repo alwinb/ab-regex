@@ -23,24 +23,25 @@ const compareAgainstDelim = cmpK =>
 
 // ### Lookup
 
-function lookup (xs, key, cmpKD = cmp) {
+const lookup = (xs, key, cmpKD = cmp) => {
   let di = 1, l = xs.length;
-  for (; di < xs.length && cmpKD (key, xs[di]) >= 0; di+=2);
-  return xs[di-1]
+  while (di < l && cmpKD (key, xs[di]) >= 0) di += 2
+  return xs [di-1]
 }
 
 // ### Merge
 
-function* merge (fn, xs, ys, cmpD = cmp, cmpV = cmp) {
-  xs = xs [Symbol.iterator] ()
-  ys = ys [Symbol.iterator] ()
+const it = xs =>
+  xs [Symbol.iterator] ()
+
+const merge = (cmpD, cmpV) => function* merge (fn, xs, ys) {
+  xs = it (xs), ys = it (ys)
   let { value:x } = xs.next ()
   let { value:y } = ys.next ()
   let { value:sepx, done:lastx } = xs.next ()
   let { value:sepy, done:lasty } = ys.next ()
   let xy = fn (x, y)
   // log ('combined first', {x, y, v:xy})
-
   while (!(lastx && lasty)) { let dord
     const [sep, decide]
       = !lastx && lasty ? [sepx, -1]
@@ -55,7 +56,7 @@ function* merge (fn, xs, ys, cmpD = cmp, cmpV = cmp) {
     if (decide >= 0) (
       { value:y } = ys.next (),
       { value:sepy, done:lasty } = ys.next () )
-    
+
     const v = fn (x, y)
     // log ('combined', {last:xy, x, y, v})
     if (cmpV (v, xy) !== 0) {
@@ -81,36 +82,6 @@ function* spans (store) {
 }
 
 
-// Test
-// ----
-
-/*
-const cmp = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-var xs = [ true, 0, false, 10, true]
-var ys = [ false, 6, true ]
-var zs = [ false, 0, false, 1, false, 2, true, 4, false]
-var top = [ true ]
-
-const pair = (a, b) => [a,b]
-const snd = (a, b) => b
-const fst = (a, b) => a
-const and = (a, b) => a && b
-const or = (a, b) => a || b
-const eq = (a, b) => a === b
-
-/*
-log (xs, ... merge (eq,  xs, xs))
-log (xs, ... merge (or, top, xs))
-log (xs, ... merge (pair, xs, ys))
-log (xs, 'lookup', -1, lookup (xs, -1, cmp) )
-log (xs, 'lookup', 0, lookup (xs, 0,   cmp) )
-log (xs, 'lookup', 1, lookup (xs, 1,   cmp) )
-log (xs, 'lookup', 9, lookup (xs, 9,   cmp) )
-log (xs, 'lookup', 10, lookup (xs, 10, cmp) )
-log (xs, 'lookup', 11, lookup (xs, 11, cmp) )
-//*/
-
-
 // RangeMap API
 // ------------
 
@@ -118,9 +89,9 @@ RangeMap.above = a => [ABOVE, a]
 RangeMap.below = a => [BELOW, a]
 
 function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = RangeMap.above } = { }) {
-  const compareD  = compareDelim (compareKey)
+  const merged = merge (compareDelim (compareKey), compareValue)
   const compareKD = compareAgainstDelim (compareKey)
-
+  
   if (typeof compareKey !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareKey function.')
 
@@ -135,39 +106,25 @@ function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = R
       })
     }
 
+    static constant (value) {
+      return new this ([value])
+    }
+
     static mapped (fn, list) {
       // FIXME need to handle above/ below normalisations
-      return new this (merge (fn, list.store, [null], compareD, compareValue))
+      return new this (merged (fn, list.store, [null]))
     }
 
     static merged (fn, list1, list2) {
-      return new this (merge (fn, list1.store, list2.store, compareD, compareValue, { below, above }))
-    }
-
-    static fromConstant (value) {
-      return new this ([value])
+      return new this (merged (fn, list1.store, list2.store))
     }
 
     lookup (key) {
       return lookup (this.store, key, compareKD)
     }
 
-    toString () {
-      return this._toString () .join ('')
-    }
-
-    *ranges () {
-      yield* spans (this.store)
-    }
-
-    _toString () {
-      const r = [this.store[0]]
-      for (let i=1; i<this.store.length; i+=2) {
-        if (this.store[i][0] === BELOW) r.push (' |', this.store[i][1], ' ')
-        else r.push (' ', this.store[i][1], '| ')
-        r.push (this.store[i+1])
-      }
-      return r // this.store // Array.from (this.iterate (([d,k]) => d === BELOW ? '|'+k : k+'|'))
+    spans () {
+      return spans (this.store)
     }
 
   }
@@ -186,78 +143,65 @@ RangeSet.above = a => [ABOVE, a]
 RangeSet.below = a => [BELOW, a]
 
 function RangeSet (compareElement, { below = RangeSet.below, above = RangeSet.above } = { }) {
+  const compareKD = compareAgainstDelim (compareElement)
+
   if (typeof compareElement !== 'function')
     throw new TypeError ('RangeSet class constructor requires compareElement function.')
 
-  class RangeSet extends RangeMap (compareElement, compareBoolean) {
+  return class RangeSet extends RangeMap (compareElement, compareBoolean) {
 
-    static get full () {
-      return new RangeSet ([true])
-    }
-
-    static get empty () {
-      return new RangeSet ([false])
-    }
+    static get top   () { return new this ([ true  ]) }
+    static get full  () { return new this ([ true  ]) }
+    static get empty () { return new this ([ false ]) }
 
     static fromElement (a) {
-      return new RangeSet ([false, below (a), true, above (a), false])
+      return new this ([ false, below (a), true, above (a), false ])
     }
 
     static fromRange (a, b) {
-      const c = compareElement (a, b)
-      if (c > 0) return RangeSet.bottom
-      return new RangeSet ([false, below (a), true, above (b), false])
+      if (compareElement (a, b) > 0) return this.empty
+      else return new this ([false, below (a), true, above (b), false])
     }
 
-    static uptoBelow (k) {
-      return new RangeSet ([true, below (k), false])
-    }
-    
-    static uptoAbove (k) {
-      return new RangeSet ([true, above (k), false])
-    }
-    
-    static fromBelow (k) {
-      return new RangeSet ([false, below (k), true])
-    }
-    
-    static fromAbove (k) {
-      return new RangeSet ([false, above (k), true])
-    }
-    
-    static and (set1, set2) {
-      return this.merged ((a,b) => a && b, set1, set2)
-    }
-
-    static or (set1, set2) {
-      return this.merged ((a,b) => a || b, set1, set2)
-    }
-
-    static diff (set1, set2) {
-      return this.merged ((a,b) => a !== b, set1, set2)
-    }
+    static uptoBelow (k) { return new this ([ true, below (k), false ]) }
+    static uptoAbove (k) { return new this ([ true, above (k), false ]) }
+    static fromBelow (k) { return new this ([ false, below (k), true ]) }
+    static fromAbove (k) { return new this ([ false, above (k), true ]) }
 
     static not (set1) {
       return this.mapped (a => !a, set1)
     }
+
+    static and  (set1, set2) {
+      return this.merged ((a,b) =>  a && b, set1, set2)
+    }
     
-    *ranges () {
+    static or   (set1, set2) {
+      return this.merged ((a,b) =>  a || b, set1, set2)
+    }
+    
+    static diff (set1, set2) {
+      return this.merged ((a,b) => a !== b, set1, set2)
+    }
+    
+    negate () {
+      return this.constructor.not (this)
+    }
+
+    test (key) {
+      return lookup (this.store, key, compareKD)
+    }
+
+    *spans () {
       for (const { start, end, value } of spans (this.store))
         if (value) yield { start, end }
     }
 
-    negate () {
-      return RangeSet.not (this)
-    }
   }
-
-  RangeSet.prototype.top = RangeSet.prototype.full
-  RangeSet.prototype.test = RangeSet.prototype.lookup
-  return RangeSet
 }
 
 
 // Exports
 // -------
 
-module.exports = { RangeMap, RangeSet }
+module.exports = { RangeMap, RangeSet, _private: { merge, lookup } }

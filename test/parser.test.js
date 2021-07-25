@@ -1,4 +1,4 @@
-const { parse } = require ('../src/grammar')
+const { parse } = require ('../src/signature')
 const { Shared, _print } = require ('../src/normalize')
 const inspect = require ('util').inspect
 const log = console.log.bind (console)

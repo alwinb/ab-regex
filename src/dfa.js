@@ -1,8 +1,8 @@
-const log = console.log.bind (console)
-const json = x => JSON.stringify (x, null, 2)
-const { Algebra } = require ('./signature')
+const { fmap, Algebra, operators:T, typeNames } = require ('./signature')
 const { Normalised, _print } = require ('./normalize')
 const { RangeMap, RangeSet } = require ('./rangemap')
+const log = console.log.bind (console)
+
 
 // CharSets
 // --------
@@ -10,11 +10,14 @@ const { RangeMap, RangeSet } = require ('./rangemap')
 const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 
+const cp = (str) =>
+  str.codePointAt (0)
+
 const above = cp =>
   RangeSet.below (cp + 1)
 
-const CharMap = RangeMap (cmpJs, cmpJs, { above })
-const CharSet = RangeSet (cmpJs, { above })
+const CharSet =
+  RangeSet (cmpJs, { above })
 
 
 // One Level Unfoldings
@@ -30,7 +33,6 @@ const Accepts = {
   any:    false,
   step:   (...args) => false,
   range:  (...args) => false,
-  group:  (...args) => args[0],
   repeat: (a0, l,m) => l === 0 ? true : a0,
   not:    (...args) => !args[0],
   or:     (...args) => args.includes (true),
@@ -45,10 +47,6 @@ const Accepts = {
 // consisting of a normalised term as an id, an'accepts' boolean, and
 // a RangeMap, from chars to normalised derivative regexp terms. 
 
-const first = ({term}) => term
-const second = ({accepts}) => accepts
-const third = ({derivs}) => derivs
-const cp = (str) => str.codePointAt (0)
 
 function OneLevel (Terms = new Normalised ()) {
 
@@ -65,39 +63,21 @@ function OneLevel (Terms = new Normalised ()) {
 
     *[Symbol.iterator] () {
       const { id, term, accepts, derivs } = this
-      yield* [id, print (term), accepts, ... Derivs.mapped (print, derivs) .store ]
-    }
-
-    toString () {
-      const { term, accepts, derivs } = this
-      return [
-        term,
-        print (term),
-        accepts,
-        `[ ${ Derivs.mapped (print, derivs) } ]`
-        //derivs.toString ()
-      ] .join (' ')
+      yield* [id, print (term), accepts, [... Derivs.mapped (print, derivs) .store ]]
     }
   }
 
 
-  return new (class OneLevel {
+  return new class OneLevel {
 
   constructor () {
-    this.bottom = new State (Terms.bottom, Accepts.bottom, Derivs.fromConstant (Terms.bottom))
-    this.top    = new State (Terms.top,    Accepts.top,    Derivs.fromConstant (Terms.top))
-    this.empty  = new State (Terms.empty,  Accepts.empty,  Derivs.fromConstant (Terms.bottom))
-    this.any    = new State (Terms.any,    Accepts.any,    Derivs.fromConstant (Terms.empty))
+    this.bottom = new State (Terms.bottom, Accepts.bottom, Derivs.constant (Terms.bottom))
+    this.top    = new State (Terms.top,    Accepts.top,    Derivs.constant (Terms.top))
+    this.empty  = new State (Terms.empty,  Accepts.empty,  Derivs.constant (Terms.bottom))
+    this.any    = new State (Terms.any,    Accepts.any,    Derivs.constant (Terms.empty))
     this.apply  = Algebra.fromObject (this)
-    
-    this._heap = Terms._heap
+    this._heap  = Terms._heap
   }
-
-  *[Symbol.iterator] () {
-    yield* Terms._heap
-  }
-
-  group (x) { return x }
 
   step (char) {
     return new State (
@@ -174,8 +154,7 @@ function OneLevel (Terms = new Normalised ()) {
       !head.accepts ? left : Derivs.merged (Terms.or, left, tail.derivs) // ∂(rs) = (∂r)s + nu(r)∂s
     )
   }
-
-})}
+}}
 
 
 // Compiler
@@ -196,13 +175,7 @@ function Compiler () {
     states.push (Unfolded.apply (...x))
 
   this._inspect = function* () {
-    for (let s of states)
-      yield String (s)
-  }
-
-  this[Symbol.iterator] = function* () {
-    for (let s of states)
-      yield s
+    for (let s of states) yield [...s]
   }
 
   function apply (...fx) {
@@ -213,7 +186,7 @@ function Compiler () {
       //log ('compile started at', i, 'created', d.id)
       //log (states.map (x => x == null ? null : x.id))
       for (; i<heap.length; i++) if (!states[i]) {
-          let dop = Algebra.fmap (y => states[y]) (heap[i])
+          let dop = fmap (y => states[y]) (heap[i])
           //log ('missing state', i, dop)
           let d = Unfolded.apply (...dop)
           //log ('created', d)
@@ -222,9 +195,11 @@ function Compiler () {
       return d
     }
     catch (e) {
-      console.log (`Error in ${ this.constructor.name }.apply`)
-      console.log (`Calling ${ json(fx[0]) } on ${ fx.slice (1) }in Algebra${ this.constructor.name }`)
-      console.log (this [Symbol.iterator] ? [...this._inspect ()] : this)
+      const msg = `Error in ${this.constructor.name}.apply: ` + e.message 
+      console.log (msg)
+      const op = fx[0], args = fx.slice (1)
+      console.log (`Calling`, typeof op === 'bigint' ? typeNames [op] : op, `on `, args, 'in Algebra')
+      log (this._inspect ? this._inspect () : this)
       throw e
     }
   }
@@ -243,5 +218,6 @@ function Compiler () {
   }
 
 }
+
 
 module.exports = { OneLevel, Compiler, Normalised, CharSet }
