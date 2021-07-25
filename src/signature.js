@@ -1,130 +1,184 @@
+const hoop = require ('../lib/hoop2')
+const { opInfo, token, tokenType, start, atom, prefix, infix, postfix, assoc, end } = hoop
+const { LEAF, PREFIX, INFIX, POSTFIX } = hoop.Roles
+const { raw } = String
 const log = console.log.bind (console)
-const json = x => JSON.stringify (x, null, 2)
 
-//  Signature
 
-// A 'Node' is _one level_ of a Regex AST tree
-// The Node 'class' is just a namespace at the moment
-// Nodes themselves are simply arrays [operator, ...args]
+// HOOP Grammar for Regex
+// ======================
 
-const Operators =  {
-  TOP : 'top', 
-  BOT : 'bottom', 
-  EMPTY : 'empty', 
-  STEP: 'step', 
-  ANY : 'any', 
-  RANGE : 'range', 
-  GROUP: 'group', 
-  REPEAT : 'repeat', 
-  STAR : 'star', 
-  OPT : 'opt', 
-  PLUS : 'plus', 
-  NOT : 'not', 
-  AND: 'and', 
-  OR : 'or', 
-  CONC : 'conc', 
-  // Hacked in here, used by normalise
-  // ORS: 'ors',
-  // CONCS: 'concs',
+// ### Preliminaries
+
+const skips = {
+  space:   raw `[\t\f\x20]+`,
+  newline: raw `[\n]` , 
 }
 
-const {
-  TOP, BOT, EMPTY, 
-  STEP, ANY, RANGE,
-  GROUP, REPEAT, NOT,
-  AND, OR, CONC, ORS, CONCS } = Operators
+// ### Hoop Signature
+// Operators are grouped by precedence and ordered
+// by streangth, increasing. 
+
+const Regex = {
+  name: 'Regex',
+  skip: skips,
+  end: end `[)]`,
+  sig: [
+    { any:    atom `[.]`
+    , top:    atom `[⊤]`
+    , bottom: atom `[⊥]`
+    , empty:  atom `[ε]`
+    , step:   atom `[a-zA-Z0-9]`
+    , string: [LEAF, `["]`, 'Chars',   `["]` ] // wrapfix-atom
+    , range:  [LEAF, `[[]`, 'RangeSet',  `]` ] // wrapfix-atom
+    , group:  [LEAF, `[(]`, 'Regex',   `[)]` ] }, // wrapfix-atom
+
+    { and:    assoc  `[&]`  },
+    { or:     assoc  `[|]`  },
+    { conc:   assoc  `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε\t\f\x20\n])` },
+    { not:    prefix `[!]`  },
+
+    { star:   postfix `[*]`
+    , opt:    postfix `[?]`
+    , plus:   postfix `[+]`
+    , repeat: postfix `<\d+(?:-(?:\d+|[*]))?>` },
+  ]
+}
+
+const Chars = {
+  name: 'Chars',
+  end: end `["]`,
+  sig: [
+    { chars:  atom `[^\x00-\x19\\"]` // +
+    , esc:    atom `[\\]["/\\bfnrt]`
+    , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
+    , empty:  atom `.{0}(?=")` },
+    { strcat: assoc `.{0}(?!")` }
+  ]
+}
+
+const RangeSet = {
+  name: 'RangeSet',
+  end: end `]`,
+  sig: [
+    { range:  atom `[^\x00-\x19\]]-[^\x00-\x19\]]`
+    , char:   atom `[^\x00-\x19\]]`
+    // , esc:    atom `[\\]["/\\bfnrt]`
+    // , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
+    , empty:  atom `.{0}(?=\])` },
+    { or:    assoc `.{0}(?!\])` }
+  ]
+}
+
+// Compile the grammar
+// -------------------
+
+const { lexers, types } =
+  hoop.compile ({ Regex, Chars, RangeSet })
+
+// Collecting the names for the node types
+
+const typeNames = {}
+const _ts = types
+for (const ruleName in _ts)
+  for (const typeName in _ts[ruleName])
+    typeNames[_ts[ruleName][typeName]] = typeName
+    // typeNames[_ts[ruleName][typeName]] = ruleName +'.' + typeName
+
+const T = types.Regex
+
+
+// Terms
+// =====
+
+// A 'Node' is _one level_ of a Regex AST tree, they are
+// stored simply as arrays [operator, ...args]
+
+// for (let k in T)
+//   log (k, ':', opInfo (T[k]))
+
+
+// Signature functor, morphism part
+
+const fmap = fn => tm => {
+  const [c, ...args] = tm
+  return c === T.step  ? tm
+    : c === T.any    ? tm
+    : c === T.range  ? tm
+    : c === T.empty  ? tm
+    : c === T.top    ? tm
+    : c === T.bottom ? tm
+    : c === T.repeat ? [c, fn (args[0]), args[1], args[2]]
+    : [c, ...args.map (fn)] }
+
+
+// compareNode; lifts a total order on elements X,
+//  to a total order on nodes FX
+
+const compareNode = compareElement => (a, b) => {
+  const c = a[0], d = b[0]
+  const r = cmpJs (c, d)
+    || (c === T.step  && 0 || cmpJs (a[1], b[1]))
+    || (c === T.range && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
+    || (c === T.repeat && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
+    || _compareArgs (compareElement) (a, b)
+  return r }
 
 const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 
 const _compareArgs = cmpX => (a, b) => {
-  let r = cmpJs (a.length, b.length), i = 1
+  let r = cmpJs (a.length, b.length)
   for (let i = 1; !r && i < a.length; i++)
     r = r || cmpX (a[i], b[i])
   return r
 }
 
-//log (["_n00", "_aap", "_baa", "_6aaas"].sort(_compareArgs(cmpJs)))
 
 // I like the idea of
 //  just converting between apply and the object
 //  So this is what this does. 
 
-class Algebra {
+const Algebra = {
 
-  // Signature functor, morphism part
-
-  static fmap (fn) { return tm => {
-    const [c, ...args] = tm
-    return c === STEP  ? tm
-      : c === ANY    ? tm
-      : c === RANGE  ? tm
-      : c === EMPTY  ? tm
-      : c === TOP    ? tm
-      : c === BOT    ? tm
-      : c === REPEAT ? [c, fn (args[0]), args[1], args[2]]
-      : [c, ...args.map (fn)] }
-  }
-
-  // compare; lifts a total order on node elements X
-  //  to a total order of Nodes with elements FX
-
-  static compareNode (compareElement) { return (a, b) => {
-    const c = a[0], d = b[0]
-    const r = Algebra.compareOperator (c, d)
-      || (c === STEP  && 0 || cmpJs (a[1], b[1]))
-      || (c === RANGE && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
-      || (c === REPEAT && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
-      || _compareArgs (compareElement) (a, b)
-    return r }
-  }
-
-  // compare on the operator only
-
-  static compareOperator (op1, op2) {
-    return cmpJs (op1, op2)
-  }
-
-  static fromObject (object) { 
+  fromObject (object) { 
     return (op, ...args) => { try {
-      return false ? false
-        : op === BOT   ? object.bottom
-        : op === TOP   ? object.top
-        : op === EMPTY ? object.empty
-        : op === ANY   ? object.any
-        : object [op] (...args)
+      return op === T.bottom ? object.bottom
+        : op === T.top    ? object.top
+        : op === T.empty  ? object.empty
+        : op === T.any    ? object.any
+        : object [typeNames[op]] (...args)
       }
       catch (e) {
-        const msg = `Error in ${object.constructor.name}.apply`
+        const msg = `Error in ${object.constructor.name}.apply: ` + e.message
         console.log (msg)
-        console.log (`Calling ${json(op)} on `, args, 'in Algebra')
+        console.log (`Calling`, op, `on`, args, 'in Algebra')
         console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
         throw new Error (msg)
       }
     }
-  }
+  },
 
-  static fromFunction (apply) {
+  fromFunction (apply) {
     return {
-      bottom: apply (BOT),
-      top:    apply (TOP),
-      empty:  apply (EMPTY),
-      any:    apply (ANY),
-      step:   (a)     => apply (STEP,  a ),
-      range:  (a, b)  => apply (RANGE, a, b),
-      group:  (r)     => apply (GROUP, r   ),
-      repeat: (r,l,m) => apply (REPEAT, r, l, m),
-      star:   (r)     => apply (REPEAT, r, 0, Infinity),
-      plus:   (r)     => apply (PLUS,  r   ),
-      opt:    (r)     => apply (OPT,   r   ),
-      not:    (r)     => apply (NOT,   r   ),
-      and:    (r, s)  => apply (AND,   r, s),
-      or:     (...as) => apply (OR,   ...as),
-      conc:   (...as) => apply (CONC, ...as),
-      ors:    (...as) => apply (ORS,   ...as),
-      concs:  (...as) => apply (CONCS, ...as),
+      bottom: apply (T.bottom),
+      top:    apply (T.top),
+      empty:  apply (T.empty),
+      any:    apply (T.any),
+      step:   (a)     => apply (T.step,   a ),
+      range:  (a, b)  => apply (T.range,  a, b),
+      group:  (r)     => apply (T.group,  r   ),
+      repeat: (r,l,m) => apply (T.repeat, r, l, m),
+      star:   (r)     => apply (T.repeat, r, 0, Infinity),
+      plus:   (r)     => apply (T.plus,   r   ),
+      opt:    (r)     => apply (T.opt,    r   ),
+      not:    (r)     => apply (T.not,    r   ),
+      and:    (r, s)  => apply (T.and,    r, s),
+      or:     (...as) => apply (T.or,    ...as),
+      conc:   (...as) => apply (T.conc,  ...as),
     }
   }
 }
 
-module.exports = { cmpJs, Operators, Algebra }
+
+module.exports = { lexers, signature:types, operators:types.Regex, Algebra, fmap, compareNode }

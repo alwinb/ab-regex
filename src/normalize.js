@@ -1,26 +1,11 @@
 const Map = require ('./aatree.js')
-const { Algebra, Operators } = require ('./signature.js')
+const { fmap, compareNode, operators:T, Algebra } = require ('./signature.js')
+const cmpJs = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 const log = console.log.bind (console)
 
-//
-//  Basic utilities
 
-const cmpJs = (t1, t2) =>
-  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-
-
-// Signature
-// ==========
-
-// A 'Node' is _one level_ of a Regex AST tree
-// The Node 'class' is just a namespace at the moment
-// Nodes themselves are simply arrays [operator, ...args]
-
-const {
-  TOP, BOT, EMPTY, 
-  STEP, ANY, RANGE,
-  GROUP, REPEAT, NOT,
-  AND, OR, CONC, ORS, CONCS } = Operators
+// Printing
+// ========
 
 // Allright; cleaning this up?
 // So
@@ -32,20 +17,20 @@ function _printFx (out, [op, ...args]) {
   const [a, b] = args
   const p = x => _print (out, x)
   return (
-      op === STEP   ? a
-    : op === ANY    ? '.'
-    : op === RANGE  ? `[${a}-${b}]`
-    : op === EMPTY  ? 'ε'
-    : op === TOP    ? '⊤'
-    : op === BOT    ? '⊥'
-    : op === GROUP  ? `(${p(a)})`
-    : op === NOT    ? `(!${p(a)})`
-    : op === REPEAT ? `(${p(a)}${printRepeat(args[1], args[2])})`
-    : op === AND    ? `(${ args .map (p) .join (' & ') })`
-    : op === OR     ? `(${ args .map (p) .join (' | ') })`
-    : op === CONC   ? `(${ args .map (p) .join ('')    })`
-    : op === ORS    ? `(${ args .map (p) .join (' | ') })`
-    : op === CONCS  ? `(${ args .map (p) .join ('')    })`
+      op === T.step   ? a
+    : op === T.any    ? '.'
+    : op === T.range  ? `[${a}-${b}]`
+    : op === T.empty  ? 'ε'
+    : op === T.top    ? '⊤'
+    : op === T.bottom ? '⊥'
+    : op === T.group  ? `(${p(a)})`
+    : op === T.not    ? `(!${p(a)})`
+    : op === T.repeat ? `(${p(a)}${printRepeat(args[1], args[2])})`
+    : op === T.and    ? `(${ args .map (p) .join (' & ') })`
+    : op === T.or     ? `(${ args .map (p) .join (' | ') })`
+    : op === T.conc   ? `(${ args .map (p) .join ('')    })`
+    : op === T.ors    ? `(${ args .map (p) .join (' | ') })`
+    : op === T.concs  ? `(${ args .map (p) .join ('')    })`
     : '' ) }
 
 function printRepeat (l, m) {
@@ -64,23 +49,25 @@ function Shared () {
 
   const out = x => this._heap [x]
   const apply = (...fx) => {
-    //log ('Shared _apply', fx)
+    // log ('Shared _apply', fx)
     const cursor = this._memo.select (fx)
-    //log ('_inn', {fx, cursor, heap})
+    // log ('_inn', {fx, cursor, heap:this._heap})
     if (cursor.found) return cursor.value
     const x = this._heap.push (fx) - 1
     this._memo = cursor.set (x)
     return x
   }
 
-  this._memo = new Map (Algebra.compareNode (cmpJs))
+  this._memo = new Map (compareNode (cmpJs))
   this._heap = []
   this.out = out
   this.apply = apply
 
   function* entries () {
-    for (let [k,item] of this._heap.entries ()) yield [k, _print (out, k), item]
+    for (let [k,item] of this._heap.entries ())
+      yield [k, _print (out, k), item]
   }
+
   this[Symbol.iterator] = entries.bind (this)
 
   Object.setPrototypeOf (this, Algebra.fromFunction (apply))
@@ -91,7 +78,7 @@ function Shared () {
 // =====================
 
 // OrdList SemiLattice
-// used for flattening nested ORs
+// used for flattening nested T.ors
 
 function OrdList (compareElement = cmpJs) {
 
@@ -115,7 +102,7 @@ function OrdList (compareElement = cmpJs) {
 
 // log (OrdList (cmpJs) .join ("acejhs", "abcdegjs") .join (''))
 
-// 'Squash' Semigroup for flattening nested CONCs;
+// 'Squash' Semigroup for flattening nested T.concs;
 // Implemented as concatenation of nonempty lists, possibly squashing
 // the last element of the first list with first element of the second list.
 
@@ -136,7 +123,7 @@ function SquashSemiGroup (squash) {
 // Finally, the Normalised term store. 
 // This implements the regex signature,
 // but internally it uses a different signature, with
-// n-ary OR and CONC nodes. 
+// n-ary T.or and T.conc nodes. 
 
 function Normalised (Store = new Shared ()) {
 
@@ -177,7 +164,7 @@ return new (class Normalised {
 
   not (a1) {
     const [c, a11] = Store.out (a1)
-    return c === NOT ? a11 : Store.not (a1) // !!r == r
+    return c === T.not ? a11 : Store.not (a1) // !!r == r
   }
 
   // Unified quantifiers; denoting omega with * here:
@@ -200,7 +187,7 @@ return new (class Normalised {
       : a1 === empty  ? empty
       : a1 === top    ? top
       : a1 === bottom ? bottom
-      : c === REPEAT  ? Store.repeat (x, ordTimes (least, l), ordTimes (most, m))
+      : c === T.repeat  ? Store.repeat (x, ordTimes (least, l), ordTimes (most, m))
       : Store.repeat (a1, least, most)
   }
 
@@ -231,13 +218,13 @@ return new (class Normalised {
     if (a1 === empty) return repeat (a2, 0, 1) // ε | r = r?
     if (a2 === empty) return repeat (a1, 0, 1) // r | ε = r?
 
-    // (r | s) | t  =  r | (s | t) = OR{ r, s, t }
-    // (r | s) | (t | u) = OR { r, s, t, u }
+    // (r | s) | t  =  r | (s | t) = T.or{ r, s, t }
+    // (r | s) | (t | u) = T.or { r, s, t, u }
 
     //log ('or', a1, a2)
     const expand = a => {
       let [op, ...as] = Store.out (a)
-      return op === OR || op === ORS ? as : [a] }
+      return op === T.or || op === T.ors ? as : [a] }
 
     //log ('expand', expand (a1), expand (a2))
 
@@ -246,8 +233,8 @@ return new (class Normalised {
     //log ('or disjuncts', disjuncts)
 
     const r = disjuncts.length === 1 ? disjuncts[0]
-      : disjuncts.length === 2 ? Store.apply (OR, ...disjuncts)
-      : Store.apply (OR, ...disjuncts)
+      : disjuncts.length === 2 ? Store.apply (T.or, ...disjuncts)
+      : Store.apply (T.or, ...disjuncts)
     
     //log ('stored', r, Store.out(r))
     return r
@@ -265,13 +252,13 @@ return new (class Normalised {
 
     const expand = a => {
       let [op, ...as] = Store.out (a)
-      return op === CONC || op === CONCS ? as : [a] }
+      return op === T.conc || op === T.concs ? as : [a] }
 
     const joined = SquashSemiGroup (this._squash.bind (this)) .join (expand (a1), expand (a2))
     //log ('conc result', concats, concats.length === 1, concats[1])
     const r = joined.length === 1 ? joined[0]
-      : joined.length === 2 ? Store.apply (CONC, ...joined)
-      : Store.apply (CONC, ...joined)
+      : joined.length === 2 ? Store.apply (T.conc, ...joined)
+      : Store.apply (T.conc, ...joined)
     //log ('stored', r)
     return r
   }
@@ -280,11 +267,11 @@ return new (class Normalised {
       // log ('squash', a, b)
       let [aop, a1, aleast, amost] = Store.out (a)
       let [bop, b1, bleast, bmost] = Store.out (b)
-      const r = aop === REPEAT && bop === REPEAT && a1 === b1
+      const r = aop === T.repeat && bop === T.repeat && a1 === b1
           ? [ Store.repeat (a1, aleast + bleast, amost + bmost) ]
-        : a === b1 && bop === REPEAT
+        : a === b1 && bop === T.repeat
           ? [ Store.repeat (a, bleast+1, bmost+1) ]
-        : aop === REPEAT && b === a1
+        : aop === T.repeat && b === a1
           ? [ Store.repeat (b, aleast+1, amost+1) ]
         : a === b
           ? [ Store.repeat (a, 2, 2) ]
@@ -294,5 +281,9 @@ return new (class Normalised {
   }
 
 })}
+
+
+// Exports
+// -------
 
 module.exports = { Shared, Normalised, _print }

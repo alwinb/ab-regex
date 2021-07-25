@@ -1,33 +1,11 @@
-const { parse } = require ('../src/grammar')
-const { Algebra } = require ('./signature')
-const { Normalised, OneLevel } = require ('./dfa')
-const { RangeMap } = require ('./rangemap')
 const Map = require ('./aatree.js')
+const { fmap, Algebra } = require ('./signature')
+const { parse } = require ('../src/grammar')
+const { Normalised } = require ('./normalize')
+const { RangeMap } = require ('./rangemap')
+const { OneLevel } = require ('./dfa')
 const log = console.log.bind (console)
 const compare = (t1, t2) => t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-
-
-// Iterator library
-// ----------------
-
-function* iterate (xs)
-  { yield* xs }
-
-function* concat (...args)
-  { for (const xs of args) yield* xs }
-
-function* _zip (choose, left, right, both, as, bs) {
-  as = iterate (as), bs = iterate (bs)
-  let a = as.next (), b = bs.next ()
-  while (!(a.done && b.done)) {
-    if (b.done) { yield left  (a.value); for (let a of as) yield left  (a); return }
-    if (a.done) { yield right (b.value); for (let b of bs) yield right (b); return }
-    const c = choose (a.value, b.value)
-    if (c < 0) { yield left  (a.value); a = as.next () } else
-    if (c > 0) { yield right (b.value); b = bs.next () } else
-               { yield both (a.value, b.value); [a, b] = [as.next (), bs.next ()] }
-  }
-}
 
 
 // TokenSet
@@ -36,12 +14,11 @@ function* _zip (choose, left, right, both, as, bs) {
 // A TokensSpec is stored as a list of pairs [token-id, normalised-regex-ref]
 // with at most one token-id per unique regex-ref
 
-const compareArray = compareElement => (as, bs) => {
-  // log ('compareArray', as, bs)
-  const cs = concat ([compare (as.length, bs.length)],
-    _zip ($=> 0, $=> -1, $=> 1, compareElement, as, bs))
-  for (const c of cs) if (c) return c
-  return 0
+const compareArray = compareElement => (a, b) => {
+  let r = compare (a.length, b.length), i = 1
+  for (let i = 0; !r && i < a.length; i++)
+    r = r || compareElement (a[i], b[i])
+  return r
 }
 
 const compareSpecPair = ([name1, id1], [name2, id2]) =>
@@ -89,7 +66,7 @@ function Compiler (Terms = new Normalised ()) {
   const heap = Derivs._heap
   let specMap = new Map (compareSpec)
   const _states = [] // regex / OneLevel.States
-  const  states = [] // tokenSet / States
+  const  states = [] // tokenSet / StatesAlge
 
   //
 
@@ -146,7 +123,7 @@ function Compiler (Terms = new Normalised ()) {
     // log ('compileDeriv', ref)
     for (let i = _states.length; i <= ref; i = _states.length) {
       // log ('missing state', i, heap[i])
-      let dop = Algebra.fmap (y => _states[y]) (heap[i])
+      let dop = fmap (y => _states[y]) (heap[i])
       let d = Derivs.apply (...dop)
       delete (d.id)
       // log ('created', d)

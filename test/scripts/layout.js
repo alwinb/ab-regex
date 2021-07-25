@@ -14,7 +14,7 @@ const append = (xs, x) => xs.concat ([x])
 // i.e. returns a RangeMap that maps characters to arrays of state-ids.
 
 function makeColumns (states) {
-  const acc = RM .fromConstant ([ ])
+  const acc = RM .constant ([ ])
   const fn = (acc, s) => RM .merged (append, acc, s.derivs)
   const columns = states.reduce (fn, acc)
   return columns
@@ -29,7 +29,7 @@ function makeColumns (states) {
 const splitRM = RangeMap (compare, () => -1)
 const splitDerivs = (splits) => ({ id, accepts, derivs }) => {
   const derivs_ = splitRM .merged (a => a, derivs, splits)
-  return { id, accepts, derivs:[...derivs_ .ranges ()] }
+  return { id, accepts, derivs:[...derivs_ .spans ()] }
 }
 
 // ### Make Table
@@ -42,7 +42,7 @@ function makeTable (states) {
   const cols = makeColumns (states)
   const rows = states.map (splitDerivs (cols))
   const head = []
-  for (const x of cols.ranges ()) head.push (simplifySpan (x))
+  for (const x of cols.spans ()) head.push (simplifySpan (x))
   return { head, rows, _cols:cols }
 }
 
