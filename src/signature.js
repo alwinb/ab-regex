@@ -70,40 +70,98 @@ const RangeSet = {
   ]
 }
 
+
 // Compile the grammar
 // -------------------
 
-const { lexers, sorts } =
+const { lexers, sorts:S } =
   hoop.compile ({ Regex, Chars, RangeSet })
 
-// Collecting the names for the node types
+// Only a subset of the operators are for public use, 
+//  collect them here. 
+
+const T0 =
+  S.Regex
+
+const T = { 
+  bottom:1, top:1, empty:1, any:1, 
+  step:1, range:1, repeat:1, 
+  not:1, and:1, or:1, conc:1 }
 
 const typeNames = {}
-const _ts = sorts
-for (const ruleName in _ts)
-  for (const typeName in _ts[ruleName]) {
-    typeNames[_ts[ruleName][typeName]] = typeName
-    // typeNames[_ts[ruleName][typeName]] = ruleName +'.' + typeName
-    // log (ruleName, typeName, opInfo (_ts[ruleName][typeName]))
-  }
+for (const k in T)
+  typeNames [ T[k] = T0[k] ] = k
 
 
-// TODO right, so can we make a more generic fmap, compare, etc?
-// Soo, at the moment, part of the operator info is stored on the .. lexer
-// buit for building the fmap, we need that
+// Configure the parser
+// --------------------
+
+function parse (input, apply_) {
+  const apply = apply_ == null ? preEval :
+    (...args) => {
+      // log ('preEval', { args })
+      args = preEval (...args)
+      // log ('==>', args)
+      const r = args[0] === T0.group ? args[1] : apply_ (...args)
+      // log ('==>', r)
+      return r
+    }
+  const startToken = lexers.Regex.Before.next ('(')
+  const endToken = lexers.Regex.After.next (')')
+  const p = new hoop.Parser (lexers, startToken, endToken, apply)
+  return p.parse (input)
+}
 
 
-const T = sorts.Regex
+// The parser algebra
+// ------------------
 
-// log (sorts, lexers.Regex.Before.infos, lexers.Regex.After, )
-// for (let k in T) log (k, ':', opInfo (T[k]))
+const _escapes =
+  { 'b':'\b', 'f':'\f', 'n':'\n', 'r':'\r', 't':'\t' }
+
+function preEval (...args) {
+  const [op, x1, x2] = args
+  const [tag, data] = op
+  const r
+    = tag === S.Regex.step     ? [ T.step, data ]
+    : tag === S.Regex.repeat   ? parseRepeat (data, x1)
+
+    : tag === S.Regex.star     ? [ T.repeat, x1, 0, Infinity ]
+    : tag === S.Regex.plus     ? [ T.repeat, x1, 1, Infinity ]
+    : tag === S.Regex.opt      ? [ T.repeat, x1, 0, 1 ]
+
+    : tag === S.Regex.group    ? [ T0.group, x1 ]
+    : tag === S.Regex.range    ? [ T0.group, x1 ]
+    : tag === S.Regex.string   ? [ T0.group, x1 ]
+
+    : tag === S.Chars.empty    ? [ T.empty ]
+    : tag === S.Chars.chars    ? [ T.step, data ]
+    : tag === S.Chars.esc      ? [ T.step, _escapes [data[1]] || data[1] ]
+    : tag === S.Chars.hexesc   ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
+    : tag === S.Chars.strcat   ? [ T.conc, ...args.slice (1) ]
+
+    : tag === S.RangeSet.empty ? [ T.empty ]
+    : tag === S.RangeSet.range ? [ T.range, data[0], data[2] ]
+    : tag === S.RangeSet.char  ? [ T.step,  data ]
+    : tag === S.RangeSet.or    ? [ T.or,    ...args.slice (1) ]
+
+    : (args[0] = tag, args)
+  return r
+}
+
+function parseRepeat (data, arg) {
+  let [l, m] = data.substr (1, data.length-2) .split ('-')
+  l = Math.max (+l, 0)
+  m = m == null ? l : m === '*' ? Infinity : +m
+  return [ T.repeat, arg, l, m ]
+}
 
 
-// Terms
-// =====
+// Terms / AST Nodes
+// =================
 
-// A 'Node' is _one level_ of a Regex AST tree, they are
-// stored simply as arrays [operator, ...args]
+const cmpJs = (t1, t2) =>
+  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 
 // Signature functor, morphism part
 
@@ -116,8 +174,8 @@ const fmap = fn => tm => {
     : [c, ...args.map (fn)] }
 
 
-// compareNode; lifts a total order on elements X,
-//  to a total order on nodes FX
+// compareNode; lifts a comparison on elements stored in an AST node,
+//  to a total order on the AST nodes themselves.
 
 const compareNode = compareElement => (a, b) => {
   const c = a[0], d = b[0]
@@ -128,58 +186,56 @@ const compareNode = compareElement => (a, b) => {
     || _compareArgs (compareElement) (a, b)
   return r }
 
-const cmpJs = (t1, t2) =>
-  t1 < t2 ? -1 : t1 > t2 ? 1 : 0
-
-const _compareArgs = cmpX => (a, b) => {
+const _compareArgs = compareElement => (a, b) => {
   let r = cmpJs (a.length, b.length)
   for (let i = 1; !r && i < a.length; i++)
-    r = r || cmpX (a[i], b[i])
+    r = r || compareElement (a[i], b[i])
   return r
 }
 
 
-// I like the idea of
-//  just converting between apply and the object
-//  So this is what this does. 
+// Algebra APIs
+// ------------
 
-const Algebra = {
+// There are _two_ interfaces. One is as a single apply function
+// that takes as its first argument the operator, and arguments as rest. 
+// An alternative interface is that of an object / dict with constants 
+// and functions as named by the operators. 
+// The following allows converting between them. 
 
-  fromObject (object) { 
-    return (op, ...args) => { try {
-      const name = typeNames[op]
-      return op & CONST ? object[name] : object [name] (...args)
-      }
-      catch (e) {
-        const msg = `Error in ${object.constructor.name}.apply: ` + e.message
-        console.log (msg)
-        console.log (`Calling`, op, `on`, args, 'in Algebra')
-        console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
-        throw new Error (msg)
-      }
-    }
-  },
+const fromObject = object => (op, ...args) => {
 
-  fromFunction (apply) {
-    return {
-      bottom: apply (T.bottom),
-      top:    apply (T.top),
-      empty:  apply (T.empty),
-      any:    apply (T.any),
-      step:   (a)     => apply (T.step,   a ),
-      range:  (a, b)  => apply (T.range,  a, b),
-      group:  (r)     => apply (T.group,  r   ),
-      repeat: (r,l,m) => apply (T.repeat, r, l, m),
-      star:   (r)     => apply (T.repeat, r, 0, Infinity),
-      plus:   (r)     => apply (T.plus,   r   ),
-      opt:    (r)     => apply (T.opt,    r   ),
-      not:    (r)     => apply (T.not,    r   ),
-      and:    (r, s)  => apply (T.and,    r, s),
-      or:     (...as) => apply (T.or,    ...as),
-      conc:   (...as) => apply (T.conc,  ...as),
-    }
+  try {
+    const name = typeNames[op]
+    return op & CONST
+      ? object[name]
+      : object [name] (...args)
+  }
+
+  catch (e) {
+    const msg = `Error in ${object.constructor.name}.apply: ` + e.message
+    console.log (msg)
+    console.log (`Calling`, op, `on`, args, 'in Algebra')
+    console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
+    throw new Error (msg)
   }
 }
 
+const fromFunction = apply => {
+  const alg = { }
+  for (const k in T) {
+    const op = T [k]
+    alg [k] = op & CONST ? apply (op)
+      : (...args) => apply (op, ...args) }
+  return alg
+}
 
-module.exports = { lexers, sorts, operators:sorts.Regex, Algebra, fmap, compareNode }
+
+// Exports
+// -------
+
+module.exports = {
+  operators:T,
+  fmap, compareNode, parse,
+  Algebra: { fromObject, fromFunction }
+}

@@ -1,4 +1,4 @@
-const { parse } = require ('../src/grammar')
+const { parse } = require ('./signature')
 const { TermStore, Compiler, CharSet } = require ('./dfa')
 const { RangeMap, RangeSet } =require ('./rangemap')
 const TS = require ('./tokenset')

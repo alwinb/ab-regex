@@ -1,7 +1,6 @@
-const { fmap, Algebra } = require ('./signature')
+const { fmap, Algebra, operators:T, typeNames } = require ('./signature')
 const { Normalised, _print } = require ('./normalize')
 const { RangeMap, RangeSet } = require ('./rangemap')
-const { operators:T, typeNames } = require ('./grammar')
 const log = console.log.bind (console)
 
 
@@ -34,7 +33,6 @@ const Accepts = {
   any:    false,
   step:   (...args) => false,
   range:  (...args) => false,
-  group:  (...args) => args[0],
   repeat: (a0, l,m) => l === 0 ? true : a0,
   not:    (...args) => !args[0],
   or:     (...args) => args.includes (true),
@@ -80,8 +78,6 @@ function OneLevel (Terms = new Normalised ()) {
     this.apply  = Algebra.fromObject (this)
     this._heap  = Terms._heap
   }
-
-  group (x) { return x }
 
   step (char) {
     return new State (

@@ -23,14 +23,11 @@ function _printFx (out, [op, ...args]) {
     : op === T.empty  ? 'ε'
     : op === T.top    ? '⊤'
     : op === T.bottom ? '⊥'
-    : op === T.group  ? `(${p(a)})`
     : op === T.not    ? `(!${p(a)})`
     : op === T.repeat ? `(${p(a)}${printRepeat(args[1], args[2])})`
     : op === T.and    ? `(${ args .map (p) .join (' & ') })`
     : op === T.or     ? `(${ args .map (p) .join (' | ') })`
     : op === T.conc   ? `(${ args .map (p) .join ('')    })`
-    : op === T.ors    ? `(${ args .map (p) .join (' | ') })`
-    : op === T.concs  ? `(${ args .map (p) .join ('')    })`
     : '' ) }
 
 function printRepeat (l, m) {
@@ -156,10 +153,6 @@ return new (class Normalised {
 
   range (...args) {
     return Store.range (...args)
-  }
-
-  group (x) {
-    return x
   }
 
   not (a1) {

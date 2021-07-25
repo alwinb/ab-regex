@@ -1,6 +1,5 @@
 const Map = require ('./aatree.js')
-const { fmap, Algebra } = require ('./signature')
-const { parse } = require ('../src/grammar')
+const { fmap, Algebra, parse } = require ('./signature')
 const { Normalised } = require ('./normalize')
 const { RangeMap } = require ('./rangemap')
 const { OneLevel } = require ('./dfa')
