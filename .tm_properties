@@ -2,6 +2,7 @@
 # TextMate configuration
 
 excludeInFolderSearch = "{ignore,dist,node_modules}"
+excludeInBrowser = "{ignore,node_modules}"
 
 
 # Setting TM_RUN_TARGET to be picked up by my Run Javascript Command
