@@ -1,3 +1,4 @@
+const { raw } = String
 
 var samples = [
 
@@ -8,11 +9,27 @@ var samples = [
   'ε',
   '.',
   'a',
-  '[a-z]', 
+  '[]',
   '[a]', 
   '[ac]', 
+  '[a-z]', 
+  '[z-a]', 
   '[a-zA-Z]',
 
+  // Ranges / careful!
+
+  '[ ]',
+  '[ x]',
+  '[x ]',
+  '[ x ]',
+  '[-]',
+  '[--]',
+  '[a-]',
+  '[-a]',
+  '[---]',
+  raw `[\\]`,
+  raw `[\n]`,
+  raw `[ \x20 ]`,
 
   
   // Disjunction

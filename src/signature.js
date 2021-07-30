@@ -11,7 +11,7 @@ const log = console.log.bind (console)
 // ### Preliminaries
 
 const skips = {
-  space:   raw `[\t\f\x20]+`,
+  space:   raw `[\t \f \x20]+`,
   newline: raw `[\n]` , 
 }
 
@@ -35,7 +35,7 @@ const Regex = {
 
     { and:    assoc  `[&]`  },
     { or:     assoc  `[|]`  },
-    { conc:   assoc  `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε\t\f\x20\n])` },
+    { conc:   assoc  `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε \t \f \x20 \n])` },
     { not:    prefix `[!]`  },
 
     { star:   postfix `[*]`
@@ -45,28 +45,38 @@ const Regex = {
   ]
 }
 
+// Sting syntax - The same as JSON, but with additional support
+// for 2-digit hexadecimal escape sequences: such as \x0A and the like.
+
 const Chars = {
   name: 'Chars',
   end: end `["]`,
   sig: [
     { chars:  atom `[^\x00-\x19\\"]` // +
-    , esc:    atom `[\\]["/\\bfnrt]`
-    , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
+    , esc:    atom `[\\] ["/ \\ bfnrt]`
+    , xesc:   atom `[\\] x[a-f A-F 0-9]{2}`
+    , hexesc: atom `[\\] u[a-f A-F 0-9]{4}`
     , empty:  konst `.{0}(?=")` },
     { strcat: assoc `.{0}(?!")` }
   ]
 }
 
+// Range syntax - Allows whitespace!
+// Ranges a-z must not use space around the hyphen
+// Supports the same escape sequences (though WIP not yet for ranges)
+
 const RangeSet = {
   name: 'RangeSet',
+  skips: skips,
   end: end `]`,
   sig: [
-    { range:  atom `[^\x00-\x19\]]-[^\x00-\x19\]]`
-    , char:   atom `[^\x00-\x19\]]`
-    // , esc:    atom `[\\]["/\\bfnrt]`
-    // , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
-    , empty: konst `.{0}(?=\])` },
-    { or:    assoc `.{0}(?!\])` }
+    { range:  atom `[^ \x00-\x20 \\ \]]-[^ \x00-\x20 \\ \]]`
+    , char:   atom `[^ \x00-\x20 \\ \]]`
+    , esc:    atom `[\\]["/ \\ bfnrt]`
+    , xesc:   atom `[\\] x[a-f A-F 0-9]{2}`
+    , hexesc: atom `[\\] u[a-f A-F 0-9]{4}`
+    , empty: konst `.{0}(?=[\x00-\x20 \]])` },
+    { or:    assoc `[\t \f \x20 \n]+ | .{0}(?!\])` }
   ]
 }
 
@@ -137,15 +147,20 @@ function preEval (...args) {
     : tag === S.Chars.empty    ? [ T.empty ]
     : tag === S.Chars.chars    ? [ T.step, data ]
     : tag === S.Chars.esc      ? [ T.step, _escapes [data[1]] || data[1] ]
+    : tag === S.Chars.xesc     ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.Chars.hexesc   ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.Chars.strcat   ? [ T.conc, ...args.slice (1) ]
 
     : tag === S.RangeSet.empty ? [ T.bottom ]
     : tag === S.RangeSet.range ? [ T.range, data[0], data[2] ]
     : tag === S.RangeSet.char  ? [ T.step,  data ]
+    : tag === S.RangeSet.esc   ? [ T.step, _escapes [data[1]] || data[1] ]
+    : tag === S.RangeSet.xesc  ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
+    : tag === S.RangeSet.hexesc? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.RangeSet.or    ? [ T.or,    ...args.slice (1) ]
 
     : (args[0] = tag, args)
+    
   return r
 }
 
