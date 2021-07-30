@@ -63,7 +63,7 @@ function OneLevel (Terms = new Normalised ()) {
 
     *[Symbol.iterator] () {
       const { id, term, accepts, derivs } = this
-      yield* [id, print (term), accepts, [... Derivs.mapped (print, derivs) .store ]]
+      yield* [id, print (term), accepts, Derivs.mapped (print, derivs) .store ]
     }
   }
 
