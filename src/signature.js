@@ -140,7 +140,7 @@ function preEval (...args) {
     : tag === S.Chars.hexesc   ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.Chars.strcat   ? [ T.conc, ...args.slice (1) ]
 
-    : tag === S.RangeSet.empty ? [ T.empty ]
+    : tag === S.RangeSet.empty ? [ T.bottom ]
     : tag === S.RangeSet.range ? [ T.range, data[0], data[2] ]
     : tag === S.RangeSet.char  ? [ T.step,  data ]
     : tag === S.RangeSet.or    ? [ T.or,    ...args.slice (1) ]
