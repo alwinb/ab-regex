@@ -68,14 +68,15 @@ const Chars = {
 
 const RangeSet = {
   name: 'RangeSet',
+  skip: skips,
   end: end `]`,
   sig: [
     { range:  atom `[^\x00-\x19\]]-[^\x00-\x19\]]`
     , char:   atom `[^\x00-\x19\]]`
     // , esc:    atom `[\\]["/\\bfnrt]`
     // , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
-    , empty: konst `.{0}(?=\])` },
-    { or:    assoc `.{0}(?!\])` }
+    , empty: konst `.{0}(?=[\]\t\f\x20\n])` },
+    { or:    assoc `.{0}(?![\]\t\f\x20\n])` }
   ]
 }
 
