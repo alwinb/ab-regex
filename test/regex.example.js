@@ -4,7 +4,7 @@ const { Compiler, OneLevel } = require ('../src/dfa')
 const log = console.log.bind (console)
 
 const store = new Compiler ()
-const { top, bottom, empty, step:char, any, range, group, repeat, star, opt, plus, not, and, or, conc, ors, concs }
+const { top, bottom, empty, char, any, range, group, repeat, star, opt, plus, not, and, or, conc, ors, concs }
   = Algebra.fromFunction (store.apply)
 
 const oneOf = chars =>

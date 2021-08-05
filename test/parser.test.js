@@ -1,5 +1,6 @@
 const { parse } = require ('../src/signature')
 const { Shared, _print } = require ('../src/normalize')
+const { CharSet } = require ('../src/charset')
 const inspect = require ('util').inspect
 const log = console.log.bind (console)
 
@@ -14,8 +15,8 @@ function testParse (sample) {
 function testStore (sample) {
   const store = new Shared ()
   const ref = parse (sample, store.apply)
-  log (sample, '==>', _print (store.out, ref))
-  log ('Store', [...store], 'item', ref)
+  // log (sample, '==>', _print (store.out, ref))
+  log ('Store', inspect([...store], {depth:5}), 'item', ref)
   log ('\n----------\n')
 }
 
