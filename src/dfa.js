@@ -1,23 +1,14 @@
 const { fmap, Algebra, operators:T, typeNames } = require ('./signature')
 const { Normalised, _print } = require ('./normalize')
 const { RangeMap, RangeSet } = require ('./rangemap')
+const { CharSet } = require ('./charset')
 const log = console.log.bind (console)
-
-
-// CharSets
-// --------
 
 const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 
 const cp = (str) =>
   str.codePointAt (0)
-
-const above = cp =>
-  RangeSet.below (cp + 1)
-
-const CharSet =
-  RangeSet (cmpJs, { above })
 
 
 // One Level Unfoldings

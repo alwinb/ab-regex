@@ -1,6 +1,7 @@
 const { parse } = require ('./signature')
-const { TermStore, Compiler, CharSet } = require ('./dfa')
 const { RangeMap, RangeSet } =require ('./rangemap')
+const { CharSet } = require ('./charset')
+const { TermStore, Compiler } = require ('./dfa')
 const TS = require ('./tokenset')
 
 // Regex Top Level API
