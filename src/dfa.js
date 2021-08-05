@@ -22,6 +22,7 @@ const Accepts = {
   top:    true,
   empty:  true,
   any:    false,
+  step:   (...args) => false,
   char:   (...args) => false,
   range:  (...args) => false,
   repeat: (a0, l,m) => l === 0 ? true : a0,
@@ -68,6 +69,14 @@ function OneLevel (Terms = new Normalised ()) {
     this.any    = new State (Terms.any,    Accepts.any,    Derivs.constant (Terms.empty))
     this.apply  = Algebra.fromObject (this)
     this._heap  = Terms._heap
+  }
+
+  step (charSet) {
+    return new State (
+      Terms.step (charSet),
+      Accepts.step (charSet),
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, charSet)
+    )
   }
 
   char (char) {

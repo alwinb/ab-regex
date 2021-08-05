@@ -99,6 +99,8 @@ const RS =
 
 const charSetOps =
   RS.range|RS.char|RS.empty|RS.or
+  // NB no, using & to check fot a charSetOp does not work, 
+  // because the flags are part of the op
 
 const T = { 
   bottom:1, top:1, empty:1, any:1, 
@@ -117,13 +119,13 @@ for (const k in RS)
 // Configure the parser
 // --------------------
 
-const wrapApply = (rxApply, rsApply) => (...args) => {
+
+const wrapApply = (rxApply, rsApply = charSetApply) => (...args) => {
   // log ('preEval', { args })
   args = preEval (...args)
-  // log ('==>', args, opInfo (args[0]), args[0] & charSetOps)
+  // log ('==>', args)
   const r = args[0] === T0.group ? args[1]
-    : args[0] === T.step ? rxApply (...args) // REVIEW temporary solution
-    : args[0] & charSetOps ? rsApply (...args)
+    : args[0] in charSetOpNames ? rsApply (...args) // REVIEW temporary solution
     : rxApply (...args)
   // log ('==>', r)
   return r
@@ -205,13 +207,18 @@ const fmap = fn => tm => {
 
 const compareNode = compareElement => (a, b) => {
   const c = a[0], d = b[0]
+  // log ('compareNode', a, b, T)
+  // log (cmpJs (a, b), c === T.char, c === T.step)
   const r = cmpJs (c, d)
-    || (c === T.char   && 0 || cmpJs (a[1], b[1]))
-    || (c === T.range  && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
-    || (c === T.step   && 0 || CharSet.compare (a[1], b[1]))
-    || (c === T.repeat && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
-    || _compareArgs (compareElement) (a, b)
-  return r }
+  if (!r) switch (c) {
+    case T.char:    return cmpJs (a[1], b[1])
+    case T.range:   return cmpJs (a[1], b[1]) || cmpJs (a[2], b[2])
+    case T.step:    return CharSet.compare (a[1], b[1])
+    case T.repeat:  return compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3])
+    default: return _compareArgs (compareElement) (a, b)
+  }
+  return r 
+}
 
 const _compareArgs = compareElement => (a, b) => {
   let r = cmpJs (a.length, b.length)
@@ -257,6 +264,11 @@ const fromFunction = apply => {
   return alg
 }
 
+const Algebra = { fromObject, fromFunction } 
+
+const charSetApply = 
+  fromObject (CharSet, charSetOpNames)
+
 
 // Exports
 // -------
@@ -266,5 +278,5 @@ module.exports = {
   operatorNames: opNames,
   charSetOpNames,
   fmap, compareNode, parse,
-  Algebra: { fromObject, fromFunction }
+  Algebra
 }

@@ -1,4 +1,4 @@
-const { parse, Algebra, charSetOpNames } = require ('../src/signature')
+const { parse } = require ('../src/signature')
 const { Shared, _print } = require ('../src/normalize')
 const { CharSet } = require ('../src/charset')
 const inspect = require ('util').inspect
@@ -16,12 +16,9 @@ function testParse (sample) {
   log ('\n----------\n')
 }
 
-const charSetApply =
-  Algebra.fromObject (CharSet, charSetOpNames)
-
 function testStore (sample) {
   const store = new Shared ()
-  const ref = parse (sample, store.apply, charSetApply)
+  const ref = parse (sample, store.apply)
   // log (sample, '==>', _print (store.out, ref))
   log ('Store', inspect([...store], {depth:5}), 'item', ref)
   log ('\n----------\n')
