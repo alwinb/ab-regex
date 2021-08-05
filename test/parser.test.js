@@ -6,8 +6,8 @@ const log = console.log.bind (console)
 
 var samples = require ('./samples')
 var samples = [
-  '[^a-z]',
   '[a-zA-Z&]'
+  // '[^a-z]',
 ]
 
 function testParse (sample) {
@@ -23,7 +23,7 @@ function testStore (sample) {
   const store = new Shared ()
   const ref = parse (sample, store.apply, charSetApply)
   // log (sample, '==>', _print (store.out, ref))
-  log ('Store', [...store], 'item', ref)
+  log ('Store', inspect([...store], {depth:5}), 'item', ref)
   log ('\n----------\n')
 }
 

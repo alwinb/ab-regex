@@ -1,6 +1,8 @@
 const hoop = require ('../lib/hoop2')
 const { opInfo, token, tokenType, start, atom, konst, prefix, infix, postfix, assoc, end } = hoop
 const { LEAF, CONST, PREFIX, INFIX, POSTFIX } = hoop.Roles
+const { CharSet } = require ('../src/charset')
+
 const { raw } = String
 const log = console.log.bind (console)
 
@@ -37,7 +39,7 @@ const Regex = {
     , char:   atom    `[a-zA-Z0-9]`
     , string: wrapfix `["]  ${ 'Chars'    }  "`
     , nrange: wrapfix `\[\^ ${ 'RangeSet' }  ]`
-    , range:  wrapfix `[[]  ${ 'RangeSet' }  ]`
+    , step:   wrapfix `[[]  ${ 'RangeSet' }  ]`
     , group:  wrapfix `[(]  ${ 'Regex'    }  )` },
 
     { and:    assoc   `[&]`  },
@@ -84,7 +86,7 @@ const RangeSet = {
 const { lexers, sorts:S } =
   hoop.compile ({ Regex, Chars, RangeSet })
 
-log (S)
+// log (S)
 
 // Only a subset of the operators are for public use, 
 //  collect them here. 
@@ -95,11 +97,12 @@ const T0 =
 const RS = 
   S.RangeSet
 
-const charSetOps = RS.range|RS.char|RS.empty|RS.or
+const charSetOps =
+  RS.range|RS.char|RS.empty|RS.or
 
 const T = { 
   bottom:1, top:1, empty:1, any:1, 
-  char:1, range:1, repeat:1, 
+  char:1, step:1, repeat:1, 
   not:1, and:1, or:1, conc:1 }
 
 const opNames = {}
@@ -117,8 +120,9 @@ for (const k in RS)
 const wrapApply = (rxApply, rsApply) => (...args) => {
   // log ('preEval', { args })
   args = preEval (...args)
-  // log ('==>', args)
+  // log ('==>', args, opInfo (args[0]), args[0] & charSetOps)
   const r = args[0] === T0.group ? args[1]
+    : args[0] === T.step ? rxApply (...args) // REVIEW temporary solution
     : args[0] & charSetOps ? rsApply (...args)
     : rxApply (...args)
   // log ('==>', r)
@@ -145,6 +149,7 @@ function preEval (...args) {
   const [tag, data] = op
   const r
     = tag === S.Regex.char     ? [ T.char, data ]
+    : tag === S.Regex.step     ? [ T.step, x1   ]
     : tag === S.Regex.repeat   ? parseRepeat (data, x1)
 
     : tag === S.Regex.star     ? [ T.repeat, x1, 0, Infinity ]
@@ -152,7 +157,6 @@ function preEval (...args) {
     : tag === S.Regex.opt      ? [ T.repeat, x1, 0, 1 ]
 
     : tag === S.Regex.group    ? [ T0.group, x1 ]
-    : tag === S.Regex.range    ? [ T0.group, x1 ]
     : tag === S.Regex.nrange   ? [ T0.group, x1 ] // NB FIXME implement the range negation!
     : tag === S.Regex.string   ? [ T0.group, x1 ]
 
@@ -191,7 +195,7 @@ const fmap = fn => tm => {
   const [c, ...args] = tm
   return c & CONST ? tm
     : c === T.char ? tm
-    : c === T.range ? tm
+    : c === T.step ? tm // NB TODO 'range' is still present in dfa ao.
     : c === T.repeat ? [c, fn (args[0]), args[1], args[2]]
     : [c, ...args.map (fn)] }
 
@@ -204,6 +208,7 @@ const compareNode = compareElement => (a, b) => {
   const r = cmpJs (c, d)
     || (c === T.char   && 0 || cmpJs (a[1], b[1]))
     || (c === T.range  && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
+    || (c === T.step   && 0 || CharSet.compare (a[1], b[1]))
     || (c === T.repeat && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
     || _compareArgs (compareElement) (a, b)
   return r }
