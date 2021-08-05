@@ -17,6 +17,11 @@ const above = cp =>
 const CharSet =
   RangeSet (cmpJs, { above })
 
+const _or = CharSet.or.bind (CharSet)
+
+CharSet.or = (...args) =>
+  args.reduce (_or)
+
 CharSet.range = (a, b) =>
   CharSet.fromRange (cp(a), cp(b))
 
@@ -39,6 +44,9 @@ CharSet.compare = ({ store:a }, { store:b }) => {
 // very quick test
 // r1 = CharSet.range ('a', 'z')
 // r2 = CharSet.range ('A', 'Z')
+// r3 = CharSet.range ('0', '9')
+// log (CharSet.or (r1,r2,r3))
+
 // log (CharSet.compare (r1, r2))
 
 
