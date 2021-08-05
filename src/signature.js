@@ -71,12 +71,12 @@ const RangeSet = {
   skip: skips,
   end: end `]`,
   sig: [
-    { range:  atom `[^\x00-\x19\]]-[^\x00-\x19\]]`
-    , char:   atom `[^\x00-\x19\]]`
-    // , esc:    atom `[\\]["/\\bfnrt]`
-    // , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
-    , empty: konst `.{0}(?=[\]\t\f\x20\n])` },
-    { or:    assoc `.{0}(?![\]\t\f\x20\n])` }
+    { range:  atom `[^ \x00-\x19 \] ]-[^ \x00-\x19 \] ]`
+    , char:   atom `[^ \x00-\x19 \\ \]]`
+    , esc:    atom `[\\] ["/\\bfnrt]`
+    , hexesc: atom `[\\] u[a-fA-F0-9]{4}`
+    , empty: konst `.{0}(?=[ \] \t \f \x20 \n ])` },
+    { or:    assoc `.{0}(?![ \] \t \f \x20 \n ])` }
   ]
 }
 
@@ -172,6 +172,8 @@ function preEval (...args) {
     : tag === S.RangeSet.empty ? [ RS.empty ]
     : tag === S.RangeSet.range ? [ RS.range, data[0], data[2] ]
     : tag === S.RangeSet.char  ? [ RS.char,  data ]
+    : tag === S.RangeSet.esc   ? [ RS.char, _escapes [data[1]] || data[1] ]
+    : tag === S.RangeSet.hexesc? [ RS.char, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.RangeSet.or    ? [ RS.or,    ...args.slice (1) ]
 
     : (args[0] = tag, args)
