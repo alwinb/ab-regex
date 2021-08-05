@@ -1,15 +1,14 @@
-
-.c {
-  text-align:center;
+html, :root { 
+  font-size:25px;
+  --border-color:#ccc;
+  --link-color:teal;
 }
 
-html { font-size:25px; }
 body { 
   font-size:18px; 
   margin-left:2rem;
   overflow-x:hidden;
 }
-a { color:teal; }
 
 h1 {
   font-size:1.7rem;
@@ -18,7 +17,7 @@ h1 {
 .selected th:first-child {
   background:teal;
   color:white;
-  border-color:black;
+  border-color:teal;
 }
 
 form {
@@ -28,7 +27,8 @@ form {
 input {
   width:100%;
   line-height:1.5rem;
-  border:1px solid #999;
+  border-width:1px;
+  border-style:solid;
   padding:0 calc(4rem + .44em) 0 .44em;
   background:#fafafa;
   border-radius:4px;
@@ -56,12 +56,14 @@ button {
   overflow:scroll;
   background:#eee;
   border-radius:4px;
-  border:1px solid #999;
+  border-width:1px;
+  border-style:solid;
 }
 
 table {
-  line-height:1.1rem;
+  line-height:1.1666rem;
   font-size:.5rem;
+  width:100%;
 }
 
 th, td {
