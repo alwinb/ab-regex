@@ -23,6 +23,7 @@ const Accepts = {
   empty:  true,
   any:    false,
   step:   (...args) => false,
+  nstep:  (...args) => false,
   char:   (...args) => false,
   range:  (...args) => false,
   repeat: (a0, l,m) => l === 0 ? true : a0,
@@ -76,6 +77,14 @@ function OneLevel (Terms = new Normalised ()) {
       Terms.step (charSet),
       Accepts.step (charSet),
       Derivs.mapped (b => b ? Terms.empty : Terms.bottom, charSet)
+    )
+  }
+
+  nstep (charSet) {
+    return new State (
+      Terms.step (charSet),
+      Accepts.step (charSet),
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, charSet.negate ())
     )
   }
 

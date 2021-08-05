@@ -155,6 +155,10 @@ return new (class Normalised {
     return Store.step (...args)
   }
 
+  nstep (...args) {
+    return Store.nstep (...args)
+  }
+
   range (...args) {
     return Store.range (...args)
   }

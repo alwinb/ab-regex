@@ -38,7 +38,7 @@ const Regex = {
     , empty:  konst   `[ε]`
     , char:   atom    `[a-zA-Z0-9]`
     , string: wrapfix `["]  ${ 'Chars'    }  "`
-    , nrange: wrapfix `\[\^ ${ 'RangeSet' }  ]`
+    , nstep:  wrapfix `\[\^ ${ 'RangeSet' }  ]`
     , step:   wrapfix `[[]  ${ 'RangeSet' }  ]`
     , group:  wrapfix `[(]  ${ 'Regex'    }  )` },
 
@@ -104,7 +104,7 @@ const charSetOps =
 
 const T = { 
   bottom:1, top:1, empty:1, any:1, 
-  char:1, step:1, repeat:1, 
+  char:1, step:1, nstep:1, repeat:1, 
   not:1, and:1, or:1, conc:1 }
 
 const opNames = {}
@@ -152,6 +152,7 @@ function preEval (...args) {
   const r
     = tag === S.Regex.char     ? [ T.char, data ]
     : tag === S.Regex.step     ? [ T.step, x1   ]
+    : tag === S.Regex.nstep    ? [ T.nstep, x1  ]
     : tag === S.Regex.repeat   ? parseRepeat (data, x1)
 
     : tag === S.Regex.star     ? [ T.repeat, x1, 0, Infinity ]
@@ -159,7 +160,6 @@ function preEval (...args) {
     : tag === S.Regex.opt      ? [ T.repeat, x1, 0, 1 ]
 
     : tag === S.Regex.group    ? [ T0.group, x1 ]
-    : tag === S.Regex.nrange   ? [ T0.group, x1 ] // NB FIXME implement the range negation!
     : tag === S.Regex.string   ? [ T0.group, x1 ]
 
     : tag === S.Chars.empty    ? [ T.empty ]

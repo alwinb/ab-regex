@@ -8,11 +8,24 @@ var samples = [
   'ε',
   '.',
   'a',
+
+  // Character Sets
+
   '[a-z]', 
   '[a]', 
   '[ac]', 
   '[a-zA-Z]',
 
+  '[z-a]',
+  '[a-z][1-1]',
+  '[a-z]a',
+
+  // Negated Character Sets
+
+  '[^a-z]', 
+  '[^a]', 
+  '[^ac]', 
+  '[^a-zA-Z]',
 
   
   // Disjunction
@@ -79,9 +92,6 @@ var samples = [
   // , '(ab)?'
   // , '(a|b)|(c|d)',
   // , '(a|b)|x|y|(c|d)',
-  // , '[z-a]', // FIXME
-  // , '[a-z][1-1]'
-  // , '[a-z]a'
   // , 'a b|a*** c&ef'
 ]
 
