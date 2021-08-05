@@ -34,7 +34,7 @@ const Regex = {
     , top:    konst   `[⊤]`
     , bottom: konst   `[⊥]`
     , empty:  konst   `[ε]`
-    , step:   atom    `[a-zA-Z0-9]`
+    , char:   atom    `[a-zA-Z0-9]`
     , string: wrapfix `["]  ${ 'Chars'    }  "`
     , nrange: wrapfix `\[\^ ${ 'RangeSet' }  ]`
     , range:  wrapfix `[[]  ${ 'RangeSet' }  ]`
@@ -56,7 +56,7 @@ const Chars = {
   name: 'Chars',
   end: end `["]`,
   sig: [
-    { chars:  atom `[^\x00-\x19\\"]` // +
+    { char:   atom `[^\x00-\x19\\"]` // +
     , esc:    atom `[\\]["/\\bfnrt]`
     , hexesc: atom `[\\]u[a-fA-F0-9]{4}`
     , empty:  konst `.{0}(?=")` },
@@ -92,7 +92,7 @@ const T0 =
 
 const T = { 
   bottom:1, top:1, empty:1, any:1, 
-  step:1, range:1, repeat:1, 
+  char:1, range:1, repeat:1, 
   not:1, and:1, or:1, conc:1 }
 
 const typeNames = {}
@@ -130,7 +130,7 @@ function preEval (...args) {
   const [op, x1, x2] = args
   const [tag, data] = op
   const r
-    = tag === S.Regex.step     ? [ T.step, data ]
+    = tag === S.Regex.char     ? [ T.char, data ]
     : tag === S.Regex.repeat   ? parseRepeat (data, x1)
 
     : tag === S.Regex.star     ? [ T.repeat, x1, 0, Infinity ]
@@ -143,9 +143,9 @@ function preEval (...args) {
     : tag === S.Regex.string   ? [ T0.group, x1 ]
 
     : tag === S.Chars.empty    ? [ T.empty ]
-    : tag === S.Chars.chars    ? [ T.step, data ]
-    : tag === S.Chars.esc      ? [ T.step, _escapes [data[1]] || data[1] ]
-    : tag === S.Chars.hexesc   ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
+    : tag === S.Chars.char     ? [ T.char, data ] // REVIEW optimise to allow stings instead of single chars?
+    : tag === S.Chars.esc      ? [ T.char, _escapes [data[1]] || data[1] ]
+    : tag === S.Chars.hexesc   ? [ T.char, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.Chars.strcat   ? [ T.conc, ...args.slice (1) ]
 
     : tag === S.RangeSet.empty ? [ T.empty ]
@@ -176,7 +176,7 @@ const cmpJs = (t1, t2) =>
 const fmap = fn => tm => {
   const [c, ...args] = tm
   return c & CONST ? tm
-    : c === T.step ? tm
+    : c === T.char ? tm
     : c === T.range ? tm
     : c === T.repeat ? [c, fn (args[0]), args[1], args[2]]
     : [c, ...args.map (fn)] }
@@ -188,8 +188,8 @@ const fmap = fn => tm => {
 const compareNode = compareElement => (a, b) => {
   const c = a[0], d = b[0]
   const r = cmpJs (c, d)
-    || (c === T.step  && 0 || cmpJs (a[1], b[1]))
-    || (c === T.range && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
+    || (c === T.char   && 0 || cmpJs (a[1], b[1]))
+    || (c === T.range  && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
     || (c === T.repeat && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
     || _compareArgs (compareElement) (a, b)
   return r }

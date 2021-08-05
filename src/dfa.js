@@ -22,7 +22,7 @@ const Accepts = {
   top:    true,
   empty:  true,
   any:    false,
-  step:   (...args) => false,
+  char:   (...args) => false,
   range:  (...args) => false,
   repeat: (a0, l,m) => l === 0 ? true : a0,
   not:    (...args) => !args[0],
@@ -70,10 +70,10 @@ function OneLevel (Terms = new Normalised ()) {
     this._heap  = Terms._heap
   }
 
-  step (char) {
+  char (char) {
     return new State (
-      Terms.step (char),
-      Accepts.step (char),
+      Terms.char (char),
+      Accepts.char (char),
       Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (cp(char)))
     )
   }
