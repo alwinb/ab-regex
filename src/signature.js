@@ -84,35 +84,49 @@ const RangeSet = {
 const { lexers, sorts:S } =
   hoop.compile ({ Regex, Chars, RangeSet })
 
+log (S)
+
 // Only a subset of the operators are for public use, 
 //  collect them here. 
 
 const T0 =
   S.Regex
 
+const RS = 
+  S.RangeSet
+
+const charSetOps = RS.range|RS.char|RS.empty|RS.or
+
 const T = { 
   bottom:1, top:1, empty:1, any:1, 
   char:1, range:1, repeat:1, 
   not:1, and:1, or:1, conc:1 }
 
-const typeNames = {}
+const opNames = {}
 for (const k in T)
-  typeNames [ T[k] = T0[k] ] = k
+  opNames [ T[k] = T0[k] ] = k
+
+const charSetOpNames = {}
+for (const k in RS)
+  charSetOpNames [ RS[k] ] = k
 
 
 // Configure the parser
 // --------------------
 
-function parse (input, apply_) {
-  const apply = apply_ == null ? preEval :
-    (...args) => {
-      // log ('preEval', { args })
-      args = preEval (...args)
-      // log ('==>', args)
-      const r = args[0] === T0.group ? args[1] : apply_ (...args)
-      // log ('==>', r)
-      return r
-    }
+const wrapApply = (rxApply, rsApply) => (...args) => {
+  // log ('preEval', { args })
+  args = preEval (...args)
+  // log ('==>', args)
+  const r = args[0] === T0.group ? args[1]
+    : args[0] & charSetOps ? rsApply (...args)
+    : rxApply (...args)
+  // log ('==>', r)
+  return r
+}
+
+function parse (input, regexApply, rangeSetApply) {
+  const apply = regexApply == null ? preEval : wrapApply (regexApply, rangeSetApply)
   const startToken = lexers.Regex.Before.next ('(')
   const endToken = lexers.Regex.After.next (')')
   const p = new hoop.Parser (lexers, startToken, endToken, apply)
@@ -148,10 +162,10 @@ function preEval (...args) {
     : tag === S.Chars.hexesc   ? [ T.char, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.Chars.strcat   ? [ T.conc, ...args.slice (1) ]
 
-    : tag === S.RangeSet.empty ? [ T.empty ]
-    : tag === S.RangeSet.range ? [ T.range, data[0], data[2] ]
-    : tag === S.RangeSet.char  ? [ T.step,  data ]
-    : tag === S.RangeSet.or    ? [ T.or,    ...args.slice (1) ]
+    : tag === S.RangeSet.empty ? [ RS.empty ]
+    : tag === S.RangeSet.range ? [ RS.range, data[0], data[2] ]
+    : tag === S.RangeSet.char  ? [ RS.char,  data ]
+    : tag === S.RangeSet.or    ? [ RS.or,    ...args.slice (1) ]
 
     : (args[0] = tag, args)
   return r
@@ -211,19 +225,19 @@ const _compareArgs = compareElement => (a, b) => {
 // and functions as named by the operators. 
 // The following allows converting between them. 
 
-const fromObject = object => (op, ...args) => {
+const fromObject = (object, names = opNames) => (op, ...args) => {
 
   try {
-    const name = typeNames[op]
+    const name = names[op]
     return op & CONST
-      ? object[name]
+      ? object [name]
       : object [name] (...args)
   }
 
   catch (e) {
     const msg = `Error in ${object.constructor.name}.apply: ` + e.message
     console.log (msg)
-    console.log (`Calling`, op, `on`, args, 'in Algebra')
+    console.log (`Calling`, opNames[op]||op, `on`, args, 'in Algebra')
     console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
     throw new Error (msg)
   }
@@ -244,6 +258,8 @@ const fromFunction = apply => {
 
 module.exports = {
   operators:T,
+  operatorNames: opNames,
+  charSetOpNames,
   fmap, compareNode, parse,
   Algebra: { fromObject, fromFunction }
 }
