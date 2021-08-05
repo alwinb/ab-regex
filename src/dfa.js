@@ -1,23 +1,14 @@
 const { fmap, Algebra, operators:T, typeNames } = require ('./signature')
 const { Normalised, _print } = require ('./normalize')
 const { RangeMap, RangeSet } = require ('./rangemap')
+const { CharSet } = require ('./charset')
 const log = console.log.bind (console)
-
-
-// CharSets
-// --------
 
 const cmpJs = (t1, t2) =>
   t1 < t2 ? -1 : t1 > t2 ? 1 : 0
 
 const cp = (str) =>
   str.codePointAt (0)
-
-const above = cp =>
-  RangeSet.below (cp + 1)
-
-const CharSet =
-  RangeSet (cmpJs, { above })
 
 
 // One Level Unfoldings
@@ -32,6 +23,8 @@ const Accepts = {
   empty:  true,
   any:    false,
   step:   (...args) => false,
+  nstep:  (...args) => false,
+  char:   (...args) => false,
   range:  (...args) => false,
   repeat: (a0, l,m) => l === 0 ? true : a0,
   not:    (...args) => !args[0],
@@ -79,10 +72,26 @@ function OneLevel (Terms = new Normalised ()) {
     this._heap  = Terms._heap
   }
 
-  step (char) {
+  step (charSet) {
     return new State (
-      Terms.step (char),
-      Accepts.step (char),
+      Terms.step (charSet),
+      Accepts.step (charSet),
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, charSet)
+    )
+  }
+
+  nstep (charSet) {
+    return new State (
+      Terms.step (charSet),
+      Accepts.step (charSet),
+      Derivs.mapped (b => b ? Terms.empty : Terms.bottom, charSet.negate ())
+    )
+  }
+
+  char (char) {
+    return new State (
+      Terms.char (char),
+      Accepts.char (char),
       Derivs.mapped (b => b ? Terms.empty : Terms.bottom, CharSet.fromElement (cp(char)))
     )
   }

@@ -17,7 +17,7 @@ function _printFx (out, [op, ...args]) {
   const [a, b] = args
   const p = x => _print (out, x)
   return (
-      op === T.step   ? a
+      op === T.char   ? a
     : op === T.any    ? '.'
     : op === T.range  ? `[${a}-${b}]`
     : op === T.empty  ? 'ε'
@@ -147,8 +147,16 @@ return new (class Normalised {
     this[Symbol.iterator] = Store[Symbol.iterator]
   }
 
+  char (...args) {
+    return Store.char (...args)
+  }
+
   step (...args) {
     return Store.step (...args)
+  }
+
+  nstep (...args) {
+    return Store.nstep (...args)
   }
 
   range (...args) {

@@ -1,9 +1,17 @@
 const hoop = require ('../lib/hoop2')
 const { opInfo, token, tokenType, start, atom, konst, prefix, infix, postfix, assoc, end } = hoop
 const { LEAF, CONST, PREFIX, INFIX, POSTFIX } = hoop.Roles
+const { CharSet } = require ('../src/charset')
+
 const { raw } = String
 const log = console.log.bind (console)
 
+const wrapfix = (...args) => {
+  if (args.length !== 2) 
+    throw new Error ('wrapfix operator definition must use one placeholder')
+  const [left, right] = args[0] .raw .map (_ => _.replace (/\s/g, ''))
+  return [LEAF, left, args[1], right]
+}  
 
 // HOOP Grammar for Regex
 // ======================
@@ -24,19 +32,20 @@ const Regex = {
   skip: skips,
   end: end `[)]`,
   sig: [
-    { any:    konst `[.]`
-    , top:    konst `[⊤]`
-    , bottom: konst `[⊥]`
-    , empty:  konst `[ε]`
-    , step:   atom `[a-zA-Z0-9]`
-    , string: [LEAF, `["]`, 'Chars',   `["]` ] // wrapfix-atom
-    , range:  [LEAF, `[[]`, 'RangeSet',  `]` ] // wrapfix-atom
-    , group:  [LEAF, `[(]`, 'Regex',   `[)]` ] }, // wrapfix-atom
+    { any:    konst   `[.]`
+    , top:    konst   `[⊤]`
+    , bottom: konst   `[⊥]`
+    , empty:  konst   `[ε]`
+    , char:   atom    `[a-zA-Z0-9]`
+    , string: wrapfix `["]  ${ 'Chars'    }  "`
+    , nstep:  wrapfix `\[\^ ${ 'RangeSet' }  ]`
+    , step:   wrapfix `[[]  ${ 'RangeSet' }  ]`
+    , group:  wrapfix `[(]  ${ 'Regex'    }  )` },
 
-    { and:    assoc  `[&]`  },
-    { or:     assoc  `[|]`  },
-    { conc:   assoc  `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε \t \f \x20 \n])` },
-    { not:    prefix `[!]`  },
+    { and:    assoc   `[&]`  },
+    { or:     assoc   `[|]`  },
+    { conc:   assoc   `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε\t\f\x20\n])` },
+    { not:    prefix  `[!]`  },
 
     { star:   postfix `[*]`
     , opt:    postfix `[?]`
@@ -45,17 +54,17 @@ const Regex = {
   ]
 }
 
-// Sting syntax - The same as JSON, but with additional support
+// String syntax - The same as JSON, but with additional support
 // for 2-digit hexadecimal escape sequences: such as \x0A and the like.
 
 const Chars = {
   name: 'Chars',
   end: end `["]`,
   sig: [
-    { chars:  atom `[^\x00-\x19\\"]` // +
-    , esc:    atom `[\\] ["/ \\ bfnrt]`
-    , xesc:   atom `[\\] x[a-f A-F 0-9]{2}`
-    , hexesc: atom `[\\] u[a-f A-F 0-9]{4}`
+    { char:   atom `[^ \x00-\x19 \\"]` // +
+    , esc:    atom `[\\] ["/\\bfnrt]`
+    , xesc:   atom `[\\] x [a-f A-F 0-9]{2}`
+    , hexesc: atom `[\\] u [a-f A-F 0-9]{4}`
     , empty:  konst `.{0}(?=")` },
     { strcat: assoc `.{0}(?!")` }
   ]
@@ -67,16 +76,16 @@ const Chars = {
 
 const RangeSet = {
   name: 'RangeSet',
-  skips: skips,
+  skip: skips,
   end: end `]`,
   sig: [
-    { range:  atom `[^ \x00-\x20 \\ \]]-[^ \x00-\x20 \\ \]]`
-    , char:   atom `[^ \x00-\x20 \\ \]]`
-    , esc:    atom `[\\]["/ \\ bfnrt]`
-    , xesc:   atom `[\\] x[a-f A-F 0-9]{2}`
-    , hexesc: atom `[\\] u[a-f A-F 0-9]{4}`
-    , empty: konst `.{0}(?=[\x00-\x20 \]])` },
-    { or:    assoc `[\t \f \x20 \n]+ | .{0}(?!\])` }
+    { range:  atom `[^ \x00-\x19 \] ]-[^ \x00-\x19 \] ]`
+    , char:   atom `[^ \x00-\x19 \\ \]]`
+    , esc:    atom `[\\] ["/ \\ bfnrt]`
+    , xesc:   atom `[\\] x [a-f A-F 0-9]{2}`
+    , hexesc: atom `[\\] u [a-f A-F 0-9]{4}`
+    , empty: konst `.{0}(?=[ \] \t \f \x20 \n ])` },
+    { or:    assoc `.{0}(?![ \] \t \f \x20 \n ])` }
   ]
 }
 
@@ -87,35 +96,53 @@ const RangeSet = {
 const { lexers, sorts:S } =
   hoop.compile ({ Regex, Chars, RangeSet })
 
+// log (S)
+
 // Only a subset of the operators are for public use, 
 //  collect them here. 
 
 const T0 =
   S.Regex
 
+const RS = 
+  S.RangeSet
+
+const charSetOps =
+  RS.range|RS.char|RS.empty|RS.or
+  // NB no, using & to check fot a charSetOp does not work, 
+  // because the flags are part of the op
+
 const T = { 
   bottom:1, top:1, empty:1, any:1, 
-  step:1, range:1, repeat:1, 
+  char:1, step:1, nstep:1, repeat:1, 
   not:1, and:1, or:1, conc:1 }
 
-const typeNames = {}
+const opNames = {}
 for (const k in T)
-  typeNames [ T[k] = T0[k] ] = k
+  opNames [ T[k] = T0[k] ] = k
+
+const charSetOpNames = {}
+for (const k in RS)
+  charSetOpNames [ RS[k] ] = k
 
 
 // Configure the parser
 // --------------------
 
-function parse (input, apply_) {
-  const apply = apply_ == null ? preEval :
-    (...args) => {
-      // log ('preEval', { args })
-      args = preEval (...args)
-      // log ('==>', args)
-      const r = args[0] === T0.group ? args[1] : apply_ (...args)
-      // log ('==>', r)
-      return r
-    }
+
+const wrapApply = (rxApply, rsApply = charSetApply) => (...args) => {
+  // log ('preEval', { args })
+  args = preEval (...args)
+  // log ('==>', args)
+  const r = args[0] === T0.group ? args[1]
+    : args[0] in charSetOpNames ? rsApply (...args) // REVIEW temporary solution
+    : rxApply (...args)
+  // log ('==>', r)
+  return r
+}
+
+function parse (input, regexApply, rangeSetApply) {
+  const apply = regexApply == null ? preEval : wrapApply (regexApply, rangeSetApply)
   const startToken = lexers.Regex.Before.next ('(')
   const endToken = lexers.Regex.After.next (')')
   const p = new hoop.Parser (lexers, startToken, endToken, apply)
@@ -133,7 +160,9 @@ function preEval (...args) {
   const [op, x1, x2] = args
   const [tag, data] = op
   const r
-    = tag === S.Regex.step     ? [ T.step, data ]
+    = tag === S.Regex.char     ? [ T.char, data ]
+    : tag === S.Regex.step     ? [ T.step, x1   ]
+    : tag === S.Regex.nstep    ? [ T.nstep, x1  ]
     : tag === S.Regex.repeat   ? parseRepeat (data, x1)
 
     : tag === S.Regex.star     ? [ T.repeat, x1, 0, Infinity ]
@@ -141,23 +170,22 @@ function preEval (...args) {
     : tag === S.Regex.opt      ? [ T.repeat, x1, 0, 1 ]
 
     : tag === S.Regex.group    ? [ T0.group, x1 ]
-    : tag === S.Regex.range    ? [ T0.group, x1 ]
     : tag === S.Regex.string   ? [ T0.group, x1 ]
 
     : tag === S.Chars.empty    ? [ T.empty ]
-    : tag === S.Chars.chars    ? [ T.step, data ]
-    : tag === S.Chars.esc      ? [ T.step, _escapes [data[1]] || data[1] ]
-    : tag === S.Chars.xesc     ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
-    : tag === S.Chars.hexesc   ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
+    : tag === S.Chars.char     ? [ T.char, data ] // REVIEW optimise to allow stings instead of single chars?
+    : tag === S.Chars.esc      ? [ T.char, _escapes [data[1]] || data[1] ]
+    : tag === S.Chars.xesc     ? [ T.char, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
+    : tag === S.Chars.hexesc   ? [ T.char, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
     : tag === S.Chars.strcat   ? [ T.conc, ...args.slice (1) ]
 
-    : tag === S.RangeSet.empty ? [ T.bottom ]
-    : tag === S.RangeSet.range ? [ T.range, data[0], data[2] ]
-    : tag === S.RangeSet.char  ? [ T.step,  data ]
-    : tag === S.RangeSet.esc   ? [ T.step, _escapes [data[1]] || data[1] ]
-    : tag === S.RangeSet.xesc  ? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
-    : tag === S.RangeSet.hexesc? [ T.step, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
-    : tag === S.RangeSet.or    ? [ T.or,    ...args.slice (1) ]
+    : tag === S.RangeSet.empty ? [ RS.empty ]
+    : tag === S.RangeSet.range ? [ RS.range, data[0], data[2] ]
+    : tag === S.RangeSet.char  ? [ RS.char,  data ]
+    : tag === S.RangeSet.esc   ? [ RS.char, _escapes [data[1]] || data[1] ]
+    : tag === S.RangeSet.xesc  ? [ RS.char, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
+    : tag === S.RangeSet.hexesc? [ RS.char, String.fromCodePoint (parseInt (data.substr(2), 16)) ]
+    : tag === S.RangeSet.or    ? [ RS.or,    ...args.slice (1) ]
 
     : (args[0] = tag, args)
     
@@ -183,8 +211,8 @@ const cmpJs = (t1, t2) =>
 const fmap = fn => tm => {
   const [c, ...args] = tm
   return c & CONST ? tm
-    : c === T.step ? tm
-    : c === T.range ? tm
+    : c === T.char ? tm
+    : c === T.step ? tm // NB TODO 'range' is still present in dfa ao.
     : c === T.repeat ? [c, fn (args[0]), args[1], args[2]]
     : [c, ...args.map (fn)] }
 
@@ -194,12 +222,18 @@ const fmap = fn => tm => {
 
 const compareNode = compareElement => (a, b) => {
   const c = a[0], d = b[0]
+  // log ('compareNode', a, b, T)
+  // log (cmpJs (a, b), c === T.char, c === T.step)
   const r = cmpJs (c, d)
-    || (c === T.step  && 0 || cmpJs (a[1], b[1]))
-    || (c === T.range && 0 || cmpJs (a[1], b[1]) || cmpJs (a[2], b[2]))
-    || (c === T.repeat && 0 || compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3]))
-    || _compareArgs (compareElement) (a, b)
-  return r }
+  if (!r) switch (c) {
+    case T.char:    return cmpJs (a[1], b[1])
+    case T.range:   return cmpJs (a[1], b[1]) || cmpJs (a[2], b[2])
+    case T.step:    return CharSet.compare (a[1], b[1])
+    case T.repeat:  return compareElement (a[1], b[1]) || cmpJs (a[2], b[2]) || cmpJs (a[3], b[3])
+    default: return _compareArgs (compareElement) (a, b)
+  }
+  return r 
+}
 
 const _compareArgs = compareElement => (a, b) => {
   let r = cmpJs (a.length, b.length)
@@ -218,19 +252,19 @@ const _compareArgs = compareElement => (a, b) => {
 // and functions as named by the operators. 
 // The following allows converting between them. 
 
-const fromObject = object => (op, ...args) => {
+const fromObject = (object, names = opNames) => (op, ...args) => {
 
   try {
-    const name = typeNames[op]
+    const name = names[op]
     return op & CONST
-      ? object[name]
+      ? object [name]
       : object [name] (...args)
   }
 
   catch (e) {
     const msg = `Error in ${object.constructor.name}.apply: ` + e.message
     console.log (msg)
-    console.log (`Calling`, op, `on`, args, 'in Algebra')
+    console.log (`Calling`, opNames[op]||op, `on`, args, 'in Algebra')
     console.log (object.constructor.name, object [Symbol.iterator] ? [...object] : object)
     throw new Error (msg)
   }
@@ -245,12 +279,19 @@ const fromFunction = apply => {
   return alg
 }
 
+const Algebra = { fromObject, fromFunction } 
+
+const charSetApply = 
+  fromObject (CharSet, charSetOpNames)
+
 
 // Exports
 // -------
 
 module.exports = {
   operators:T,
+  operatorNames: opNames,
+  charSetOpNames,
   fmap, compareNode, parse,
-  Algebra: { fromObject, fromFunction }
+  Algebra
 }

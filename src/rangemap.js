@@ -102,7 +102,7 @@ function RangeMap (compareKey, compareValue, { below = RangeMap.below, above = R
 
     constructor (store) {
       Object.defineProperties (this, {
-        store: { value: Array.from (store), enumerable:false }
+        store: { value: Array.from (store), writable:false, enumerable:true }
       })
     }
 
