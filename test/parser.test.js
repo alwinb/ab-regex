@@ -4,6 +4,10 @@ const inspect = require ('util').inspect
 const log = console.log.bind (console)
 
 var samples = require ('./samples')
+var samples = [
+  '[^a-z]',
+  '[a-z]'
+]
 
 function testParse (sample) {
   log ('parse:', sample, '==>')

@@ -4,6 +4,12 @@ const { LEAF, CONST, PREFIX, INFIX, POSTFIX } = hoop.Roles
 const { raw } = String
 const log = console.log.bind (console)
 
+const wrapfix = (...args) => {
+  if (args.length !== 2) 
+    throw new Error ('wrapfix operator definition must use one placeholder')
+  const [left, right] = args[0] .raw .map (_ => _.replace (/\s/g, ''))
+  return [LEAF, left, args[1], right]
+}  
 
 // HOOP Grammar for Regex
 // ======================
@@ -24,19 +30,20 @@ const Regex = {
   skip: skips,
   end: end `[)]`,
   sig: [
-    { any:    konst `[.]`
-    , top:    konst `[⊤]`
-    , bottom: konst `[⊥]`
-    , empty:  konst `[ε]`
-    , step:   atom `[a-zA-Z0-9]`
-    , string: [LEAF, `["]`, 'Chars',   `["]` ] // wrapfix-atom
-    , range:  [LEAF, `[[]`, 'RangeSet',  `]` ] // wrapfix-atom
-    , group:  [LEAF, `[(]`, 'Regex',   `[)]` ] }, // wrapfix-atom
+    { any:    konst   `[.]`
+    , top:    konst   `[⊤]`
+    , bottom: konst   `[⊥]`
+    , empty:  konst   `[ε]`
+    , step:   atom    `[a-zA-Z0-9]`
+    , string: wrapfix `["]  ${ 'Chars'    }  "`
+    , nrange: wrapfix `\[\^ ${ 'RangeSet' }  ]`
+    , range:  wrapfix `[[]  ${ 'RangeSet' }  ]`
+    , group:  wrapfix `[(]  ${ 'Regex'    }  )` },
 
-    { and:    assoc  `[&]`  },
-    { or:     assoc  `[|]`  },
-    { conc:   assoc  `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε\t\f\x20\n])` },
-    { not:    prefix `[!]`  },
+    { and:    assoc   `[&]`  },
+    { or:     assoc   `[|]`  },
+    { conc:   assoc   `.{0}(?=[!a-zA-Z0-9."[(⊤⊥ε\t\f\x20\n])` },
+    { not:    prefix  `[!]`  },
 
     { star:   postfix `[*]`
     , opt:    postfix `[?]`
@@ -132,6 +139,7 @@ function preEval (...args) {
 
     : tag === S.Regex.group    ? [ T0.group, x1 ]
     : tag === S.Regex.range    ? [ T0.group, x1 ]
+    : tag === S.Regex.nrange   ? [ T0.group, x1 ] // NB FIXME implement the range negation!
     : tag === S.Regex.string   ? [ T0.group, x1 ]
 
     : tag === S.Chars.empty    ? [ T.empty ]
